@@ -1,7 +1,6 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
-
-const db = admin.firestore();
+import * as viewModel from "./model_view";
 
 interface versionDoc {
   last_update: admin.firestore.Timestamp;
@@ -11,27 +10,9 @@ interface versionDoc {
   pnl_structure_id: string;
 }
 
-interface viewDoc {
-  filter?: string;
-  org_level: string;
-  periods: viewPeriod[];
-  plan_id: string;
-  pnl_structure_id: string;
-  title: string;
-  total: viewTotal;
-  version_id?: string;
-}
+admin.initializeApp();
 
-interface viewTotal {
-  long: string;
-  short: string;
-}
-
-interface viewPeriod {
-  long: string;
-  number: number;
-  short: string;
-}
+const db = admin.firestore();
 
 async function deleteCollection(
   collectionRef: FirebaseFirestore.CollectionReference<
@@ -73,7 +54,7 @@ async function deleteQueryBatch(
   });
 }
 
-export const createViewForPlanVersion = functions.firestore
+export const planViewCreate = functions.firestore
   .document("entities/{entityId}/plans/{planId}/versions/{versionId}")
   .onUpdate(async (snapshot, context) => {
     try {
@@ -112,7 +93,7 @@ export const createViewForPlanVersion = functions.firestore
         .get();
 
       view_templates.forEach(async (template_doc) => {
-        const view_doc = template_doc.data() as viewDoc;
+        const view_doc = template_doc.data() as viewModel.viewDoc;
 
         const new_view_ref = await db
           .collection(`entities/${entityId}/views`)
