@@ -128,11 +128,6 @@ export const planViewReCalc = functions.firestore
 
       // final commit of any remaining items in the batch
       if (batch_counter.total_pending > 0) {
-        console.log(
-          "final commit - writing " +
-            batch_counter.total_pending +
-            " total docs"
-        );
         await acct_update_batch.commit();
       }
     } catch (error) {
@@ -229,7 +224,6 @@ async function updateViews(
   sections: boolean
 ) {
   try {
-    console.log("updating views for: " + account.full_account);
     const view_snapshots = await db
       .collection(`entities/${context_params.entityId}/views`)
       .where("plan_id", "==", context_params.planId)
@@ -237,7 +231,6 @@ async function updateViews(
       .get();
 
     for (const view_doc of view_snapshots.docs) {
-      console.log("updating view: " + view_doc.id);
       await updateViewLines(
         account,
         context_params,
@@ -271,14 +264,12 @@ async function updateViewLines(
   >
 ) {
   try {
-    console.log("updating view lines");
     const line_snapshots = await view_doc.ref
       .collection("lines")
       .where("full_account", "==", account.full_account)
       .get();
 
     for (const line_doc of line_snapshots.docs) {
-      console.log("updating line: " + line_doc.id);
       update_batch.update(line_doc.ref, {
         total: account.total,
         values: account.values,
@@ -302,20 +293,15 @@ async function updateViewSections(
   >
 ) {
   try {
-    console.log("updating sections.");
-    console.log("view_doc.ref: " + view_doc.ref);
     const sections_snapshots = await view_doc.ref
       .collection("sections")
       .where("accts.acct_ids", "array-contains", account.full_account)
       .get();
 
     for (const section_doc of sections_snapshots.docs) {
-      console.log("updating section: " + section_doc.id);
       const section_data = section_doc.data() as viewModel.sectionDoc;
-      console.log("section_data:" + JSON.stringify(section_data));
       const acct_idx = section_data.accts.acct_ids.indexOf(account.full_account);
-      console.log("acct_idx: " + acct_idx);
-      console.log('account: ' + JSON.stringify(account));
+
       // (B-1) UPDATE total/total and total/values of section
       section_data.total.total +=
         (account.total - section_data.accts.acct_data[acct_idx].total) *

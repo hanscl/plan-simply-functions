@@ -15,11 +15,4 @@ export interface parentRollup {
     values: number[];
   }
 
-// IS THIS NEEDED  
-  export interface parentAccounts {
-    div?: accountDoc;
-    dept?: accountDoc;
-  }
-  
-
   
