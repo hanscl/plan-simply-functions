@@ -42,6 +42,12 @@ export const planViewReCalc = functions.firestore
         versionId: context.params.versionId,
       };
 
+      // DEV ONLY - DO NOT PROCESS GEAMS
+      if (context_params.entityId === "GEAMS") {
+        console.log("GEAMS: Do not process");
+        return;
+      }
+
       // EXIT IF THIS IS AN INITIAL PLAN CALCULATION or rollup account level!
       if (
         (nlevel_acct_after.parent_rollup !== undefined &&
@@ -300,7 +306,9 @@ async function updateViewSections(
 
     for (const section_doc of sections_snapshots.docs) {
       const section_data = section_doc.data() as viewModel.sectionDoc;
-      const acct_idx = section_data.accts.acct_ids.indexOf(account.full_account);
+      const acct_idx = section_data.accts.acct_ids.indexOf(
+        account.full_account
+      );
 
       // (B-1) UPDATE total/total and total/values of section
       section_data.total.total +=

@@ -10,8 +10,6 @@ interface versionDoc {
   pnl_structure_id: string;
 }
 
-admin.initializeApp();
-
 const db = admin.firestore();
 
 async function deleteCollection(
@@ -64,6 +62,12 @@ export const planViewCreate = functions.firestore
       const planId = context.params.planId;
       const versionId = context.params.versionId;
 
+      // DEV ONLY - DO NOT PROCESS GEAMS
+      if(entityId === 'GEAMS') {
+        console.log('GEAMS: Do not process')
+        return;
+      }
+      
       if (
         version_after.calculated === false ||
         version_before.calculated === version_after.calculated
@@ -105,7 +109,7 @@ export const planViewCreate = functions.firestore
           const lines_targetcoll = new_view_ref.collection(collId);
           let idx = 0;
           for (const line_doc of doc_snaps.docs) {
-            write_batch.set(lines_targetcoll.doc(), line_doc.data());
+            write_batch.set(lines_targetcoll.doc(line_doc.id), line_doc.data()); // TODO preserve document id
             idx++;
             if (idx > 400) {
               idx = 0;

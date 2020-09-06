@@ -14,6 +14,12 @@ export const planViewFullCalc = functions.firestore
       const entityId = context.params.entityId;
       const viewId = context.params.viewId;
 
+      // DEV ONLY - DO NOT PROCESS GEAMS
+      if (entityId === "GEAMS") {
+        console.log("GEAMS: Do not process");
+        return;
+      }
+
       if (
         !(
           view_before.version_id === undefined &&
@@ -80,9 +86,22 @@ async function updateSections(
               acct_obj.values[periodIdx] * operation;
           }
         } else {
-            console.log("acct snapshot exists does not exist. writing 0s.");
+          console.log("acct snapshot exists does not exist. writing 0s.");
           section_obj.accts.acct_data[acct_idx].total = 0;
-          section_obj.accts.acct_data[acct_idx].values = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+          section_obj.accts.acct_data[acct_idx].values = [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+          ];
         }
       }
 
