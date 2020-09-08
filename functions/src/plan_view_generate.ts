@@ -4,7 +4,8 @@ import * as admin from "firebase-admin";
 enum RollDirection {
   Div_fromDivToDeptOrGroup,
   Dept_fromGroupToDept,
-  Dept_fromRollupToRollupOrAcct,
+  Dept_fromRollupToRollup,
+  Dept_fromRollupToAcct,
   Dept_None,
 }
 
@@ -81,6 +82,7 @@ interface contextParams {
   entityId: string;
   planId: string;
   versionId: string;
+  n_level_rollups: string[];
 }
 
 interface planDoc {
@@ -121,6 +123,16 @@ interface viewChild {
   child_accts?: viewChild[];
 }
 
+interface rollupDefDoc {
+  acct_types?: string[];
+  accts_add?: string[];
+  accts_remove?: string[];
+  child_rollups?: any;
+  level: number,
+  n_level: boolean;
+  rollup: string;
+}
+
 const db = admin.firestore();
 
 export const planViewGenerate = functions.firestore
@@ -133,6 +145,7 @@ export const planViewGenerate = functions.firestore
         entityId: "GEAMS",
         planId: context.params.planId,
         versionId: context.params.versionId,
+        n_level_rollups: [],
       };
 
       console.log(
@@ -196,6 +209,18 @@ export const planViewGenerate = functions.firestore
       const new_view_ref = await db
         .collection(`entities/${context_params.entityId}/views`)
         .add(new_view);
+
+      // find n-level rollups 
+      const rollup_doc_snap = await db.collection(`entities/${context_params.entityId}/account_rollups/${plan_obj.account_rollup}/rollups`)
+      .where("n_level", "==", true)
+      .get();
+
+      if(rollup_doc_snap.empty) throw new Error("Unable to find any n-level rollup accounts, which should not be happening!");
+
+      for(const rollup_def_doc of rollup_doc_snap.docs) {
+        const rollup_def_obj = rollup_def_doc.data() as rollupDefDoc;
+        context_params.n_level_rollups.push(rollup_def_obj.rollup);
+      }
 
       // load pnl structure doc
       const pnl_struct_snap = await db
@@ -291,13 +316,13 @@ async function rollDownLevelOrAcct(
   parent_view_obj: viewChild,
   context_params: contextParams
 ) {
-  const rollDir: RollDirection = determineRollDirection(parent_acct);
+  const rollDir: RollDirection = determineRollDirection(parent_acct, context_params.n_level_rollups);
 
   if(rollDir === RollDirection.Dept_None) return;
 
   // query the child accounts based on the rolldirection
   let child_acct_snap = undefined;
-  const version_dept_ref = db.collection(`entities/${context_params.entityId}/plans${context_params.planId}/versions/${context_params.versionId}/dept`);
+  const version_dept_ref = db.collection(`entities/${context_params.entityId}/plans/${context_params.planId}/versions/${context_params.versionId}/dept`);
   if(rollDir === RollDirection.Div_fromDivToDeptOrGroup) {
     child_acct_snap = await version_dept_ref
     .where('div', '==', parent_acct.div)
@@ -309,14 +334,18 @@ async function rollDownLevelOrAcct(
     .where('full_account', 'in', parent_acct.group_children)
     .get();
   }
-  else if(rollDir === RollDirection.Dept_fromRollupToRollupOrAcct) {
+  // TODO can this be handled indeed with one case? If so, remove n_level flag from rollups and remove query in this function, then consolidate flags
+  else if(rollDir === RollDirection.Dept_fromRollupToRollup || rollDir === RollDirection.Dept_fromRollupToAcct) {
     child_acct_snap = await version_dept_ref
     .where('parent_rollup.acct', '==', parent_acct.acct)
     .where('dept', '==', parent_acct.dept)
     .get();
   }
 
-  if(child_acct_snap === undefined || child_acct_snap.empty) throw new Error('no child account found for parent: ' + parent_acct.full_account);
+  if(child_acct_snap === undefined || child_acct_snap.empty) {
+    console.log(`No Child account found for operation ${rollDir}. Parent Account Object was: ` + JSON.stringify(parent_acct));
+    return;
+  }
 
   // we know the current account has children; create the array in the parent view object
   parent_view_obj.child_accts = [];
@@ -349,14 +378,14 @@ function getLineDescription(acct: accountDoc, rollDir: RollDirection): string {
     return acct.divdept_name;
   }
 
-  if(rollDir === RollDirection.Dept_fromRollupToRollupOrAcct) {
+  if(rollDir === RollDirection.Dept_fromRollupToRollup || rollDir === RollDirection.Dept_fromRollupToAcct) {
     return acct.acct_name;
   }
 
   return "N/A";
 }
 
-function determineRollDirection(acct: accountDoc): RollDirection {
+function determineRollDirection(acct: accountDoc, n_level_rollups: string[]): RollDirection {
   if(acct.dept === undefined) { // process div level logic
     return RollDirection.Div_fromDivToDeptOrGroup;
   }
@@ -370,8 +399,13 @@ function determineRollDirection(acct: accountDoc): RollDirection {
     return RollDirection.Dept_None;
   }
 
-  // if we get here, it means that we need to roll down from Rollup to the child-rollup or the acct
-  return RollDirection.Dept_fromRollupToRollupOrAcct;
+    // if we get here, it means that we need to roll down from Rollup to the child-rollup or the acct
+  if(acct.acct in n_level_rollups) {
+    return RollDirection.Dept_fromRollupToAcct;
+  }
+  else {
+    return RollDirection.Dept_fromRollupToRollup;
+  }
 }
 
 async function createPnlAggregate(
@@ -415,7 +449,7 @@ function addValueArrays(
     throw new Error("Attempting to add two arrays of different length.");
   }
 
-  for (let idx in arr1) {
+  for (const idx in arr1) {
     arr1[idx] += arr2[idx] * arr2ops;
   }
 
