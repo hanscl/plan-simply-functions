@@ -12,46 +12,6 @@ interface versionDoc {
 
 const db = admin.firestore();
 
-async function deleteCollection(
-  collectionRef: FirebaseFirestore.CollectionReference<
-    FirebaseFirestore.DocumentData
-  >,
-  batchSize: number
-) {
-  const query = collectionRef.orderBy("__name__").limit(batchSize);
-
-  return new Promise((resolve, reject) => {
-    deleteQueryBatch(query, resolve).catch(reject);
-  });
-}
-
-async function deleteQueryBatch(
-  query: FirebaseFirestore.Query<FirebaseFirestore.DocumentData>,
-  resolve: any
-) {
-  const snapshot = await query.get();
-
-  const batchSize = snapshot.size;
-  if (batchSize === 0) {
-    // When there are no documents left, we are done
-    resolve();
-    return;
-  }
-
-  // Delete documents in a batch
-  const batch = db.batch();
-  snapshot.docs.forEach((doc) => {
-    batch.delete(doc.ref);
-  });
-  await batch.commit();
-
-  // Recurse on the next process tick, to avoid
-  // exploding the stack.
-  process.nextTick(() => {
-    deleteQueryBatch(query, resolve).catch();
-  });
-}
-
 export const planViewCreate = functions.firestore
   .document("entities/{entityId}/plans/{planId}/versions/{versionId}")
   .onUpdate(async (snapshot, context) => {
@@ -63,11 +23,11 @@ export const planViewCreate = functions.firestore
       const versionId = context.params.versionId;
 
       // DEV ONLY - DO NOT PROCESS GEAMS
-      if(entityId === 'GEAMS') {
-        console.log('GEAMS: Do not process')
+      if (entityId === "GEAMS") {
+        console.log("GEAMS: Do not process");
         return;
       }
-      
+
       if (
         version_after.calculated === false ||
         version_before.calculated === version_after.calculated
@@ -83,8 +43,8 @@ export const planViewCreate = functions.firestore
         .get();
 
       view_snapshots.forEach(async (view_doc) => {
-        await deleteCollection(view_doc.ref.collection("lines"), 50);
-        await deleteCollection(view_doc.ref.collection("sections"), 50);
+        await deleteCollection(view_doc.ref.collection("lines"), 300);
+        await deleteCollection(view_doc.ref.collection("sections"), 300);
         await view_doc.ref.delete();
       });
 
@@ -135,3 +95,43 @@ export const planViewCreate = functions.firestore
       return;
     }
   });
+
+async function deleteCollection(
+  collectionRef: FirebaseFirestore.CollectionReference<
+    FirebaseFirestore.DocumentData
+  >,
+  batchSize: number
+) {
+  const query = collectionRef.orderBy("__name__").limit(batchSize);
+
+  return new Promise((resolve, reject) => {
+    deleteQueryBatch(query, resolve).catch(reject);
+  });
+}
+
+async function deleteQueryBatch(
+  query: FirebaseFirestore.Query<FirebaseFirestore.DocumentData>,
+  resolve: any
+) {
+  const snapshot = await query.get();
+
+  const batchSize = snapshot.size;
+  if (batchSize === 0) {
+    // When there are no documents left, we are done
+    resolve();
+    return;
+  }
+
+  // Delete documents in a batch
+  const batch = db.batch();
+  snapshot.docs.forEach((doc) => {
+    batch.delete(doc.ref);
+  });
+  await batch.commit();
+
+  // Recurse on the next process tick, to avoid
+  // exploding the stack.
+  process.nextTick(() => {
+    deleteQueryBatch(query, resolve).catch();
+  });
+}

@@ -7,6 +7,7 @@ interface versionDoc {
   number: number;
   calculated: boolean;
   pnl_structure_id: string;
+  ready_for_view?: boolean;
 }
 
 interface parentRollup {
@@ -163,15 +164,10 @@ export const planVersionGroupCalc = functions.firestore
               values[index] += child_val;
             });
             total += child_acct.total;
+            
             // save child divdept to array
-            if (group_obj.level === "div" || group_obj.level === "dept") {
-              if (child_acct[group_obj.level] !== undefined) {
-                const test = child_acct[group_obj.level];
-                if (test !== undefined) {
-                  grp_children.push(test);
-                }
-              }
-            }
+            grp_children.push(child_acct.full_account);
+
             // save division if we are processing dept level
             if (group_obj.level === "dept" && acct_div === "")
               acct_div = child_acct.div;
