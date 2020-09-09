@@ -29,6 +29,7 @@ interface accountDoc {
   total: number;
   values: number[];
   group_children?: string[];
+  is_group_child: boolean;
 }
 
 interface entityDoc {
@@ -84,7 +85,9 @@ export const planVersionGroupCalc = functions.firestore
       }
 
       // Begin processing groups. set the view_ready flag to false until we're done
-      await db.doc(`entities/${entityId}/plans/${planId}/versions/${versionId}`).update({ready_for_view: false})
+      await db
+        .doc(`entities/${entityId}/plans/${planId}/versions/${versionId}`)
+        .update({ ready_for_view: false });
 
       // find the group definitions
       const plan_snapshot = await db
@@ -164,9 +167,12 @@ export const planVersionGroupCalc = functions.firestore
               values[index] += child_val;
             });
             total += child_acct.total;
-            
+
             // save child divdept to array
             grp_children.push(child_acct.full_account);
+
+            // update the child doc so we know it is now part of a group
+            group_wx_batch.update(child_doc.ref, { is_group_child: true });
 
             // save division if we are processing dept level
             if (group_obj.level === "dept" && acct_div === "")
@@ -198,12 +204,13 @@ export const planVersionGroupCalc = functions.firestore
             acct_name: rollup_definitions[rollup_acct],
             divdept_name: group_obj.name,
             group: true,
+            is_group_child: false,
             total: total,
             values: values,
             group_children: grp_children,
           };
 
-          if(acct_dept !== undefined ) {
+          if (acct_dept !== undefined) {
             group_acct.dept = acct_dept;
           }
 
@@ -227,7 +234,9 @@ export const planVersionGroupCalc = functions.firestore
       }
 
       // all done. Set the view_ready flag to true so the view will be generated
-      await db.doc(`entities/${entityId}/plans/${planId}/versions/${versionId}`).update({ready_for_view: true})
+      await db
+        .doc(`entities/${entityId}/plans/${planId}/versions/${versionId}`)
+        .update({ ready_for_view: true });
 
       return;
     } catch (error) {

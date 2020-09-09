@@ -58,18 +58,19 @@ export const planViewCreate = functions.firestore
 
       view_templates.forEach(async (template_doc) => {
         const view_doc = template_doc.data() as viewModel.viewDoc;
-
+        console.log('found template doc: ' + JSON.stringify(template_doc))
         const new_view_ref = await db
           .collection(`entities/${entityId}/views`)
           .add(view_doc);
 
         for (const collId of ["lines", "sections"]) {
           const doc_snaps = await template_doc.ref.collection(collId).get();
+
           let write_batch = db.batch();
           const lines_targetcoll = new_view_ref.collection(collId);
           let idx = 0;
           for (const line_doc of doc_snaps.docs) {
-            write_batch.set(lines_targetcoll.doc(line_doc.id), line_doc.data()); // TODO preserve document id
+            write_batch.set(lines_targetcoll.doc(line_doc.id), line_doc.data()); 
             idx++;
             if (idx > 400) {
               idx = 0;
