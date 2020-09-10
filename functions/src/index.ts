@@ -8,5 +8,6 @@ export { planViewFullCalc } from "./plan_view_fullcalc";
 export { planViewReCalc } from "./plan_view_recalc";
 
 // NEW VERSIONS (GEAMS TESTING)
-export { planVersionGroupCalc } from "./plan_version_group_calc";
+export { planVersionGroupCreate } from "./plan_version_group_calc";
 export { planViewGenerate } from "./plan_view_generate";
+export { planVersionRecalc } from "./plan_version_recalc";

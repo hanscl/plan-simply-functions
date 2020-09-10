@@ -62,7 +62,7 @@ interface planDoc {
 
 const db = admin.firestore();
 
-export const planVersionGroupCalc = functions.firestore
+export const planVersionGroupCreate = functions.firestore
   .document("entities/GEAMS/plans/{planId}/versions/{versionId}")
   .onUpdate(async (snapshot, context) => {
     try {
