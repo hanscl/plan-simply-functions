@@ -56,13 +56,13 @@ interface contextParams {
 const db = admin.firestore();
 
 export const planVersionRecalc = functions.firestore
-  .document("entities/GEAMS/plans/{planId}/versions/{versionId}/dept/{acctId}")
+  .document("entities/GEAMS/plans/{planId}/versions/{versionId}/dept/{acctId}") // TODO CHANGE
   .onUpdate(async (snapshot, context) => {
     try {
       const nlevel_acct_before = snapshot.before.data() as accountDoc;
       const nlevel_acct_after = snapshot.after.data() as accountDoc;
       const context_params = {
-        entityId: context.params.entityId,
+        entityId: "GEAMS", //TODO: REMOVE when done with GEAMS testing
         planId: context.params.planId,
         versionId: context.params.versionId,
       };
@@ -147,7 +147,7 @@ export const planVersionRecalc = functions.firestore
         await acct_update_batch.commit();
       }
     } catch (error) {
-      console.log("Error occured during creation of new plan view: " + error);
+      console.log("Error occured during calculation of plan version: " + error);
       return;
     }
   });
@@ -211,16 +211,16 @@ async function updateParentAccounts(
         // save for returning if dept
         ret_acct_obj = acct_obj;
         // also try to find group accounts and process those
-        updateGroupAccounts(
+        await updateGroupAccounts(
           context_params,
           parent_acct.acct_id,
           update_batch,
           batch_counter,
           acct_changes
         );
-      } else if (parent_acct.type == "div") {
+      } else if (parent_acct.type === "div") {
         // also process P&L accounts
-        updatePnlAggregates(
+        await updatePnlAggregates(
           context_params,
           parent_acct.acct_id,
           update_batch,
@@ -257,17 +257,15 @@ async function updateGroupAccounts(
   acct_changes: acctChanges
 ) {
   // find any group accounts that contain the parent account
-
-  // find any group accounts that contain the parent account
   const group_parents_snap = await db
-    .collection(
-      `entities/${context_params.entityId}/plans/${context_params.planId}/versions/${context_params.versionId}/pnl`
-    )
-    .where("child_accts", "array-contains", group_child_acct)
-    .get();
+  .collection(
+    `entities/${context_params.entityId}/plans/${context_params.planId}/versions/${context_params.versionId}/dept`
+  )
+  .where("group_children", "array-contains", group_child_acct)
+  .get();
+   
   for (const group_parent_doc of group_parents_snap.docs) {
     const acct_obj = group_parent_doc.data() as accountDoc;
-    console.log(`processing group parent ${acct_obj.full_account}`);
 
     // calculate the values
     calcAccountValues(acct_changes, acct_obj, 1);
@@ -288,16 +286,15 @@ async function updatePnlAggregates(
   acct_changes: acctChanges
 ) {
   const pnl_agg_snap = await db
-    .collection(
-      `entities/${context_params.entityId}/plans/${context_params.planId}/versions/${context_params.versionId}/dept`
+   .collection(
+      `entities/${context_params.entityId}/plans/${context_params.planId}/versions/${context_params.versionId}/pnl`
     )
-    .where("group_children", "array-contains", div_account_id)
+    .where("child_accts", "array-contains",  div_account_id)
     .get();
 
   for (const pnl_doc of pnl_agg_snap.docs) {
     const pnl_obj = pnl_doc.data() as pnlAggregateDoc;
-    console.log(`processing pnl aggregate object ${pnl_doc.id}`);
-
+  
     // calculate the values
     calcAccountValues(
       acct_changes,

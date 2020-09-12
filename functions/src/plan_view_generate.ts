@@ -200,7 +200,6 @@ export const planViewGenerate = functions.firestore
         .collection(`by_org_level`)
         .get();
         sect_snapshots.forEach(async (sect_doc) =>  {
-          await deleteCollection(sect_doc.ref.collection("lines"), 300);
           await deleteCollection(sect_doc.ref.collection("sections"), 300);
         });
         await deleteCollection(view_doc.ref.collection("by_org_level"), 300);
@@ -344,7 +343,6 @@ export const planViewGenerate = functions.firestore
         };
 
         const div_view_sects = {} as viewSectionDict;
-        console.log(div_list);
         for (const div_id of div_list) {
           // filter accounts by div id
           const fltrd_div_accts = section_div_accts.filter((acct_item) => {
@@ -386,14 +384,15 @@ export const planViewGenerate = functions.firestore
           }
         } // END processing lines for section object
 
-        console.log(
-          `Section ${sectionObj.name} complete ....` +
-            JSON.stringify(cmp_view_sect)
-        );
-        console.log(
-          "Completed creating view sections for all DIVs: " +
-            JSON.stringify(div_view_sects)
-        );
+        // TODO: Remove before PROD deployment
+        // console.log(
+        //   `Section ${sectionObj.name} complete ....` +
+        //     JSON.stringify(cmp_view_sect)
+        // );
+        // console.log(
+        //   "Completed creating view sections for all DIVs: " +
+        //     JSON.stringify(div_view_sects)
+        // );
 
         // Add to BATCH & intermittent write
         write_batch.set(
@@ -503,10 +502,11 @@ async function rollDownLevelOrAcct(
   }
 
   if (child_acct_snap === undefined || child_acct_snap.empty) {
-    console.log(
-      `No Child account found for operation ${rollDir}. Parent Account Object was: ` +
-        JSON.stringify(parent_acct)
-    );
+    // TODO: remove before prod deployment
+    // console.log(
+    //   `No Child account found for operation ${rollDir}. Parent Account Object was: ` +
+    //     JSON.stringify(parent_acct)
+    // );
     return;
   }
 
