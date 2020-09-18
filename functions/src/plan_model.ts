@@ -11,13 +11,44 @@ export interface planDoc {
   type: string;
 }
 
-export interface viewTotal {
+export interface versionDoc {
+  last_update: admin.firestore.Timestamp;
+  name: string;
+  number: number;
+  calculated: boolean;
+  pnl_structure_id: string;
+  ready_for_view?: boolean;
+}
+
+interface viewTotal {
   long: string;
   short: string;
 }
 
-export interface viewPeriod {
+interface viewPeriod {
   long: string;
   number: number;
   short: string;
+}
+
+export interface accountDoc {
+  acct: string;
+  acct_name: string;
+  acct_type?: string;
+  class: string;
+  dept?: string;
+  div: string;
+  divdept_name: string;
+  group: boolean;
+  full_account: string;
+  parent_rollup?: parentRollup;
+  total: number;
+  values: number[];
+  group_children?: string[];
+  is_group_child: boolean;
+}
+
+interface parentRollup {
+  acct: string;
+  operation: number;
 }

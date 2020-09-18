@@ -1,79 +1,22 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
-
-interface versionDoc {
-  last_update: admin.firestore.Timestamp;
-  name: string;
-  number: number;
-  calculated: boolean;
-  pnl_structure_id: string;
-  ready_for_view?: boolean;
-}
-
-interface parentRollup {
-  acct: string;
-  operation: number;
-}
-
-interface accountDoc {
-  acct: string;
-  acct_name: string;
-  acct_type?: string;
-  class: string;
-  dept?: string;
-  div: string;
-  divdept_name: string;
-  group: boolean;
-  full_account: string;
-  parent_rollup?: parentRollup;
-  total: number;
-  values: number[];
-  group_children?: string[];
-  is_group_child: boolean;
-}
-
-interface entityDoc {
-  acct_type_flip_sign: string[];
-  full_account: string;
-  full_account_export: string;
-  legal: string;
-  name: string;
-  number: string;
-  type: string;
-}
-
-interface groupDoc {
-  children: string[];
-  code: string;
-  level: string;
-  name: string;
-}
-
-interface planDoc {
-  account_rollup: string;
-  begin_month: number;
-  begin_year: number;
-  created: admin.firestore.Timestamp;
-  name: string;
-  periods: any;
-  total: any;
-  type: string;
-}
+import * as plan_model from "./plan_model";
+import * as entity_model from "./entity_model";
 
 const db = admin.firestore();
 
 export const planVersionGroupCreate = functions.firestore
-  .document("entities/GEAMS/plans/{planId}/versions/{versionId}")
+  .document("entities/${entityId}/plans/{planId}/versions/{versionId}")
   .onUpdate(async (snapshot, context) => {
     try {
-      const version_before = snapshot.before.data() as versionDoc;
-      const version_after = snapshot.after.data() as versionDoc;
-      const entityId = "GEAMS";
+      const version_before = snapshot.before.data() as plan_model.versionDoc;
+      const version_after = snapshot.after.data() as plan_model.versionDoc;
+      const entityId = context.params.entityId;
       const planId = context.params.planId;
       const versionId = context.params.versionId;
 
       console.log(
-        "processing GEAMS version update => if calc from FALSE to TRUE THEN calc groupings"
+        "processing update to plan version of entity => if calc from FALSE to TRUE THEN calc groupings"
       );
 
       // Process only if the version was recalculated
@@ -106,7 +49,7 @@ export const planVersionGroupCreate = functions.firestore
         return;
       }
 
-      const entity_obj = entity_snap.data() as entityDoc;
+      const entity_obj = entity_snap.data() as entity_model.entityDoc;
 
       // get a list of rollups
       const rollup_snap = await db
@@ -121,7 +64,7 @@ export const planVersionGroupCreate = functions.firestore
       const rollup_definitions = rollup_snap.data() as Record<string, string>;
       const rollup_list = Object.keys(rollup_definitions);
 
-      const rollup_docid = (plan_snapshot.data() as planDoc).account_rollup;
+      const rollup_docid = (plan_snapshot.data() as plan_model.planDoc).account_rollup;
 
       const groups_snapshot = await db
         .collection(
@@ -138,7 +81,7 @@ export const planVersionGroupCreate = functions.firestore
       let group_ctr = 0;
 
       for (const group_doc of groups_snapshot.docs) {
-        const group_obj = group_doc.data() as groupDoc;
+        const group_obj = group_doc.data() as entity_model.groupDoc;
         console.log("processing group doc with code: " + group_obj.code);
 
         for (const rollup_acct of rollup_list) {
@@ -155,7 +98,7 @@ export const planVersionGroupCreate = functions.firestore
           let acct_div = "";
           const grp_children: string[] = [];
           for (const child_doc of acct_snapshot.docs) {
-            const child_acct = child_doc.data() as accountDoc;
+            const child_acct = child_doc.data() as plan_model.accountDoc;
             console.log(
               "adding child " +
                 child_acct.full_account +
@@ -196,7 +139,7 @@ export const planVersionGroupCreate = functions.firestore
           }
 
           // build the group account obj and add to batch
-          const group_acct: accountDoc = {
+          const group_acct: plan_model.accountDoc = {
             acct: rollup_acct,
             class: "rollup",
             div: acct_div,

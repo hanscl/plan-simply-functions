@@ -1,43 +1,16 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
+import * as plan_model from "./plan_model";
+import * as view_model from "./view_model";
 
 interface batchCounter {
   total_pending: number;
 }
 
-interface parentRollup {
-  acct: string;
-  operation: number;
-}
-
-interface accountDoc {
-  acct: string;
-  acct_name: string;
-  acct_type?: string;
-  class: string;
-  dept?: string;
-  div: string;
-  divdept_name: string;
-  group: boolean;
-  full_account: string;
-  parent_rollup?: parentRollup;
-  total: number;
-  values: number[];
-  group_children?: string[];
-  is_group_child: boolean;
-}
-interface pnlAggregateDoc {
-  child_accts: string[];
-  child_ops: number[];
-  total: number;
-  values: number[];
-  view_id: string;
-}
-
 interface parentAccounts {
   type: "dept" | "div";
   acct_id: string;
-  acct_obj?: accountDoc;
+  acct_obj?: plan_model.accountDoc;
 }
 
 interface acctChanges {
@@ -56,13 +29,13 @@ interface contextParams {
 const db = admin.firestore();
 
 export const planVersionRecalc = functions.firestore
-  .document("entities/GEAMS/plans/{planId}/versions/{versionId}/dept/{acctId}") // TODO CHANGE
+  .document("entities/${entityId}/plans/{planId}/versions/{versionId}/dept/{acctId}")
   .onUpdate(async (snapshot, context) => {
     try {
-      const nlevel_acct_before = snapshot.before.data() as accountDoc;
-      const nlevel_acct_after = snapshot.after.data() as accountDoc;
+      const nlevel_acct_before = snapshot.before.data() as plan_model.accountDoc;
+      const nlevel_acct_after = snapshot.after.data() as plan_model.accountDoc;
       const context_params = {
-        entityId: "GEAMS", //TODO: REMOVE when done with GEAMS testing
+        entityId: context.params.entityId, 
         planId: context.params.planId,
         versionId: context.params.versionId,
       };
@@ -120,7 +93,7 @@ export const planVersionRecalc = functions.firestore
       const batch_counter = { total_pending: 1 };
 
       // save account reference
-      let currChildAcct: accountDoc | undefined = nlevel_acct_after;
+      let currChildAcct: plan_model.accountDoc | undefined = nlevel_acct_after;
 
       // IF THERE IS NO PARENT ROLLUP, WE HAVE REACHED THE TOP LEVEL => END FUNCTION
       while (
@@ -153,12 +126,12 @@ export const planVersionRecalc = functions.firestore
   });
 
 async function updateParentAccounts(
-  childAccount: accountDoc,
+  childAccount: plan_model.accountDoc,
   acct_changes: acctChanges,
   update_batch: FirebaseFirestore.WriteBatch,
   batch_counter: batchCounter,
   context_params: contextParams
-): Promise<accountDoc | undefined> {
+): Promise<plan_model.accountDoc | undefined> {
   const parent_accounts: parentAccounts[] = [];
 
   if (
@@ -195,7 +168,7 @@ async function updateParentAccounts(
         .get();
       if (!acct_snap.exists) continue;
 
-      const acct_obj = acct_snap.data() as accountDoc;
+      const acct_obj = acct_snap.data() as plan_model.accountDoc;
 
       // calculate the values
       calcAccountValues(acct_changes, acct_obj, 1);
@@ -239,7 +212,7 @@ async function updateParentAccounts(
 
 function calcAccountValues(
   acct_changes: acctChanges,
-  acct_obj: accountDoc | pnlAggregateDoc,
+  acct_obj: plan_model.accountDoc | view_model.pnlAggregateDoc,
   pnl_ops: number
 ) {
   for (const idxPeriod of acct_changes.months_changed) {
@@ -258,14 +231,14 @@ async function updateGroupAccounts(
 ) {
   // find any group accounts that contain the parent account
   const group_parents_snap = await db
-  .collection(
-    `entities/${context_params.entityId}/plans/${context_params.planId}/versions/${context_params.versionId}/dept`
-  )
-  .where("group_children", "array-contains", group_child_acct)
-  .get();
-   
+    .collection(
+      `entities/${context_params.entityId}/plans/${context_params.planId}/versions/${context_params.versionId}/dept`
+    )
+    .where("group_children", "array-contains", group_child_acct)
+    .get();
+
   for (const group_parent_doc of group_parents_snap.docs) {
-    const acct_obj = group_parent_doc.data() as accountDoc;
+    const acct_obj = group_parent_doc.data() as plan_model.accountDoc;
 
     // calculate the values
     calcAccountValues(acct_changes, acct_obj, 1);
@@ -286,15 +259,15 @@ async function updatePnlAggregates(
   acct_changes: acctChanges
 ) {
   const pnl_agg_snap = await db
-   .collection(
+    .collection(
       `entities/${context_params.entityId}/plans/${context_params.planId}/versions/${context_params.versionId}/pnl`
     )
-    .where("child_accts", "array-contains",  div_account_id)
+    .where("child_accts", "array-contains", div_account_id)
     .get();
 
   for (const pnl_doc of pnl_agg_snap.docs) {
-    const pnl_obj = pnl_doc.data() as pnlAggregateDoc;
-  
+    const pnl_obj = pnl_doc.data() as view_model.pnlAggregateDoc;
+
     // calculate the values
     calcAccountValues(
       acct_changes,

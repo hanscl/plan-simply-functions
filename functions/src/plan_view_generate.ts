@@ -1,5 +1,8 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
+import * as plan_model from "./plan_model";
+import * as entity_model from "./entity_model";
+import * as view_model from "./view_model";
 
 enum RollDirection {
   Div_fromDivToDeptOrGroup,
@@ -9,76 +12,6 @@ enum RollDirection {
   Dept_None,
 }
 
-interface accountDoc {
-  acct: string;
-  acct_name: string;
-  acct_type?: string;
-  class: string;
-  dept?: string;
-  div: string;
-  divdept_name: string;
-  group: boolean;
-  full_account: string;
-  parent_rollup?: parentRollup;
-  total: number;
-  values: number[];
-  group_children?: string[];
-  is_group_child: boolean;
-}
-
-interface versionDoc {
-  last_update: admin.firestore.Timestamp;
-  name: string;
-  number: number;
-  calculated: boolean;
-  pnl_structure_id: string;
-  ready_for_view?: boolean;
-}
-
-interface pnlStructure {
-  sections: pnlSection[];
-}
-
-interface pnlSection {
-  name: string;
-  header: boolean;
-  total: boolean;
-  lines: boolean;
-  skip_levels?: number;
-  filters: pnlDivFilter[];
-}
-
-interface pnlDivFilter {
-  div: string[];
-  rollup: string;
-  operation: number;
-}
-
-interface viewDoc {
-  periods: viewPeriod[];
-  plan_id: string;
-  pnl_structure_id: string;
-  title: string;
-  total: viewTotal;
-  version_id?: string;
-}
-
-interface viewTotal {
-  long: string;
-  short: string;
-}
-
-interface viewPeriod {
-  long: string;
-  number: number;
-  short: string;
-}
-
-interface parentRollup {
-  acct: string;
-  operation: number;
-}
-
 interface contextParams {
   entityId: string;
   planId: string;
@@ -86,90 +19,28 @@ interface contextParams {
   n_level_rollups: string[];
 }
 
-interface planDoc {
-  account_rollup: string;
-  begin_month: number;
-  begin_year: number;
-  created: admin.firestore.Timestamp;
-  name: string;
-  periods: viewPeriod[];
-  total: viewTotal;
-  type: string;
-}
-
 interface accountForSection {
   operation: number;
-  account: accountDoc;
+  account: plan_model.accountDoc;
 }
 
-interface pnlAggregateDoc {
-  child_accts: string[];
-  child_ops: number[];
-  total: number;
-  values: number[];
-  view_id: string;
-}
-
-interface viewSection {
-  name: string;
-  header: boolean;
-  position: number;
-  totals_level?: string;
-  totals_id?: string;
-  lines?: viewChild[];
-}
-
-interface viewChild {
-  level: string;
-  acct: string;
-  desc: string;
-  child_accts?: viewChild[];
-}
-
-interface rollupDefDoc {
-  acct_types?: string[];
-  accts_add?: string[];
-  accts_remove?: string[];
-  child_rollups?: any;
-  level: number;
-  n_level: boolean;
-  rollup: string;
-}
-
-type viewSectionDict = {
-  [k: string]: viewSection;
-};
-
-type sectionDocRefDict = {
-  [k: string]: FirebaseFirestore.DocumentReference;
-};
-
-interface entityDoc {
-  acct_type_flip_sign: string[];
-  full_account: string;
-  full_account_export: string;
-  legal: string;
-  name: string;
-  number: string;
-  type: string;
-}
 const db = admin.firestore();
 
 export const planViewGenerate = functions.firestore
-  .document("entities/GEAMS/plans/{planId}/versions/{versionId}")
+  .document("entities/${entityId}/plans/{planId}/versions/{versionId}")
   .onUpdate(async (snapshot, context) => {
     try {
-      const version_before = snapshot.before.data() as versionDoc;
-      const version_after = snapshot.after.data() as versionDoc;
+      const version_before = snapshot.before.data() as plan_model.versionDoc;
+      const version_after = snapshot.after.data() as plan_model.versionDoc;
       const context_params: contextParams = {
-        entityId: "GEAMS",
+        entityId: context.params.entityId,
         planId: context.params.planId,
         versionId: context.params.versionId,
         n_level_rollups: [],
       };
 
       console.log(
-        "processing GEAMS view generate => if ready_for_view from FALSE to TRUE THEN proceed"
+        "processing view generate => if ready_for_view from FALSE to TRUE THEN proceed"
       );
 
       // Process only if the version was recalculated
@@ -181,11 +52,16 @@ export const planViewGenerate = functions.firestore
       }
 
       // Get entity number ...
-      const entity_snap = await db.doc(`entities/${context_params.entityId}`).get();
+      const entity_snap = await db
+        .doc(`entities/${context_params.entityId}`)
+        .get();
 
-      if(!entity_snap.exists) throw new Error('Could not find entity document for id: ' + context_params.entityId);
+      if (!entity_snap.exists)
+        throw new Error(
+          "Could not find entity document for id: " + context_params.entityId
+        );
 
-      const ent_no = (entity_snap.data() as entityDoc).number;
+      const ent_no = (entity_snap.data() as entity_model.entityDoc).number;
 
       // check if a view exists for this version; if so - delete before continuing
       // then create new plan view and write function for that
@@ -197,9 +73,9 @@ export const planViewGenerate = functions.firestore
 
       view_snapshots.forEach(async (view_doc) => {
         const sect_snapshots = await view_doc.ref
-        .collection(`by_org_level`)
-        .get();
-        sect_snapshots.forEach(async (sect_doc) =>  {
+          .collection(`by_org_level`)
+          .get();
+        sect_snapshots.forEach(async (sect_doc) => {
           await deleteCollection(sect_doc.ref.collection("sections"), 300);
         });
         await deleteCollection(view_doc.ref.collection("by_org_level"), 300);
@@ -226,10 +102,10 @@ export const planViewGenerate = functions.firestore
           "Could not find plan for view. Which is strange, because this function gets triggered by a plan version :-/"
         );
 
-      const plan_obj = plan_snapshot.data() as planDoc;
+      const plan_obj = plan_snapshot.data() as plan_model.planDoc;
 
       // Create a new view
-      const new_view: viewDoc = {
+      const new_view: view_model.viewDoc = {
         periods: plan_obj.periods,
         plan_id: context_params.planId,
         pnl_structure_id: version_after.pnl_structure_id,
@@ -256,7 +132,7 @@ export const planViewGenerate = functions.firestore
         );
 
       for (const rollup_def_doc of rollup_doc_snap.docs) {
-        const rollup_def_obj = rollup_def_doc.data() as rollupDefDoc;
+        const rollup_def_obj = rollup_def_doc.data() as entity_model.rollupDoc;
         context_params.n_level_rollups.push(rollup_def_obj.rollup);
       }
 
@@ -271,7 +147,7 @@ export const planViewGenerate = functions.firestore
           "Could not find P&L Structure definition with doc id: " +
             version_after.pnl_structure_id
         );
-      const pnl_struct_obj = pnl_struct_snap.data() as pnlStructure;
+      const pnl_struct_obj = pnl_struct_snap.data() as view_model.pnlStructure;
 
       // get list of divs for the entity
       const div_snap = await db
@@ -291,7 +167,7 @@ export const planViewGenerate = functions.firestore
       const cmp_view_doc_ref = await new_view_ref
         .collection("by_org_level")
         .add({ level: "company", filter: ent_no }); // TODO ADD CMP FILTER
-      const div_view_doc_refs: sectionDocRefDict = {};
+      const div_view_doc_refs: view_model.sectionDocRefDict = {};
       for (const div_id of div_list) {
         div_view_doc_refs[div_id] = await new_view_ref
           .collection("by_org_level")
@@ -322,7 +198,7 @@ export const planViewGenerate = functions.firestore
           for (const acct_doc of group_acct_snap.docs) {
             section_div_accts.push({
               operation: filterDef.operation,
-              account: acct_doc.data() as accountDoc,
+              account: acct_doc.data() as plan_model.accountDoc,
             });
           }
         } // END Processing Filters from Section Document
@@ -334,7 +210,7 @@ export const planViewGenerate = functions.firestore
         );
 
         // Create section document for COMPANY & DIVs
-        const cmp_view_sect: viewSection = {
+        const cmp_view_sect: view_model.viewSection = {
           name: sectionObj.name,
           position: section_pos,
           header: sectionObj.header,
@@ -342,7 +218,7 @@ export const planViewGenerate = functions.firestore
           totals_id: pnl_doc_id,
         };
 
-        const div_view_sects = {} as viewSectionDict;
+        const div_view_sects = {} as view_model.viewSectionDict;
         for (const div_id of div_list) {
           // filter accounts by div id
           const fltrd_div_accts = section_div_accts.filter((acct_item) => {
@@ -367,7 +243,7 @@ export const planViewGenerate = functions.firestore
           cmp_view_sect.lines = [];
 
           for (const div_line_acct of section_div_accts) {
-            const curr_line: viewChild = {
+            const curr_line: view_model.viewChild = {
               level: div_line_acct.account.dept !== undefined ? "dept" : "div",
               acct: div_line_acct.account.full_account,
               desc: div_line_acct.account.divdept_name,
@@ -408,37 +284,35 @@ export const planViewGenerate = functions.firestore
           write_ctr++;
         }
 
-        if(write_ctr > 400) {
+        if (write_ctr > 400) {
           await write_batch.commit();
           write_batch = db.batch();
           write_ctr = 0;
         }
-        
-
       } // END Processing Sections from PnL Structure
 
-      if(write_ctr > 0) {
+      if (write_ctr > 0) {
         await write_batch.commit();
       }
 
       return;
     } catch (error) {
       console.log(
-        "Error occured during view generation (NEW - GEAMS) " + error
+        "Error occured during view generation " + error
       );
       return;
     }
   });
 
 async function createDivViewSections(
-  section_obj: pnlSection,
+  section_obj: view_model.pnlSection,
   section_pos: number,
   fltrd_div_accts: accountForSection[],
   context_params: contextParams,
   view_id: string
-): Promise<viewSection> {
+): Promise<view_model.viewSection> {
   // setup basic object
-  const div_view_sect: viewSection = {
+  const div_view_sect: view_model.viewSection = {
     name: section_obj.name,
     header: section_obj.header,
     position: section_pos,
@@ -462,10 +336,10 @@ async function createDivViewSections(
 }
 
 async function rollDownLevelOrAcct(
-  parent_acct: accountDoc,
-  parent_view_obj: viewChild,
+  parent_acct: plan_model.accountDoc,
+  parent_view_obj: view_model.viewChild,
   context_params: contextParams,
-  div_sections: viewSectionDict
+  div_sections: view_model.viewSectionDict
 ) {
   const rollDir: RollDirection = determineRollDirection(
     parent_acct,
@@ -514,11 +388,11 @@ async function rollDownLevelOrAcct(
   parent_view_obj.child_accts = [];
 
   for (const child_acct_doc of child_acct_snap.docs) {
-    const child_acct = child_acct_doc.data() as accountDoc;
+    const child_acct = child_acct_doc.data() as plan_model.accountDoc;
     // select descriptor for this child account
     const acct_desc = getLineDescription(child_acct, rollDir);
     // create new view
-    const curr_child: viewChild = {
+    const curr_child: view_model.viewChild = {
       level: child_acct.dept !== undefined ? "dept" : "div",
       acct: child_acct.full_account,
       desc: acct_desc,
@@ -545,7 +419,10 @@ async function rollDownLevelOrAcct(
   }
 }
 
-function getLineDescription(acct: accountDoc, rollDir: RollDirection): string {
+function getLineDescription(
+  acct: plan_model.accountDoc,
+  rollDir: RollDirection
+): string {
   if (acct.class === "acct") {
     return `${acct.acct} - ${acct.acct_name}`;
   }
@@ -568,7 +445,7 @@ function getLineDescription(acct: accountDoc, rollDir: RollDirection): string {
 }
 
 function determineRollDirection(
-  acct: accountDoc,
+  acct: plan_model.accountDoc,
   n_level_rollups: string[]
 ): RollDirection {
   if (acct.dept === undefined) {
@@ -598,7 +475,7 @@ async function createPnlAggregate(
   div_accts: accountForSection[],
   view_id: string
 ): Promise<string> {
-  const pnl_aggregate: pnlAggregateDoc = {
+  const pnl_aggregate: view_model.pnlAggregateDoc = {
     child_accts: [],
     child_ops: [],
     total: 0,

@@ -1,19 +1,10 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
+import * as entity_model from "./entity_model";
 
 admin.initializeApp();
 
 const db = admin.firestore();
-
-interface entityDoc {
-  children?: string[];
-  name: string;
-  number?: string;
-  legal?: string;
-  full_account?: string;
-  full_account_export?: string;
-  acct_type_flip_sign?: string[];
-}
 
 interface userDoc {
   email: string;
@@ -57,7 +48,7 @@ async function compareEntities(
       .get();
 
     entity_snapshots.forEach(async (entity_doc) => {
-      const entity_obj = entity_doc.data() as entityDoc;
+      const entity_obj = entity_doc.data() as entity_model.entityDoc;
 
       if (entity_obj.children === undefined) return;
 
