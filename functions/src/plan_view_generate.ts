@@ -384,15 +384,15 @@ export const planViewGenerate = functions.firestore
           }
         } // END processing lines for section object
 
-        // TODO: Remove before PROD deployment
-        // console.log(
-        //   `Section ${sectionObj.name} complete ....` +
-        //     JSON.stringify(cmp_view_sect)
-        // );
-        // console.log(
-        //   "Completed creating view sections for all DIVs: " +
-        //     JSON.stringify(div_view_sects)
-        // );
+        //TODO: Remove before PROD deployment
+        console.log(
+          `Section ${sectionObj.name} complete ....` +
+            JSON.stringify(cmp_view_sect)
+        );
+        console.log(
+          "Completed creating view sections for all DIVs: " +
+            JSON.stringify(div_view_sects)
+        );
 
         // Add to BATCH & intermittent write
         write_batch.set(

@@ -11,7 +11,7 @@ export interface acctDriverDef {
   period_spread?: number[];
   drivers: (string | number)[];
   operations: ("add" | "sub" | "mlt" | "dvs" | "pct")[];
-  ref_accts: string[];
+  ref_accts?: string[];
 }
 
 export interface driverDoc {

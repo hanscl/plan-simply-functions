@@ -1,4 +1,3 @@
-import { _userWithOptions } from "firebase-functions/lib/providers/auth";
 import * as driver_model from "./driver_model";
 import * as entity_model from "./entity_model";
 import * as plan_model from "./plan_model";
@@ -68,14 +67,14 @@ export async function begin_dependency_build(
       return typeof driver === "string";
     }) as string[];
 
-    return(resolveRollups(
+    return resolveRollups(
       driver_accts,
       entity,
       rollups,
       div_dict,
       acct_dict,
       groups
-    ));
+    );
   } catch (error) {
     console.log("Error occured during driver dependency build: " + error);
     return;
@@ -87,17 +86,20 @@ function acctIsRollup(
   entity: entity_model.entityDoc,
   rollups: entity_model.rollupDoc[]
 ): boolean {
+  console.log(`checking ${full_acct} for rollup identity`);
   const acct = utils.extractAcctFromFullAccount(
     full_acct,
     [entity.full_account, entity.full_account_export],
     "acct"
   );
+  console.log(`retrieved code ${acct} from extraction function`);
   // extract acct from full account
-  if (
-    rollups.findIndex((rollup_obj) => {
-      rollup_obj.rollup === acct;
-    }) !== -1
-  ) {
+  const rollup_idx = rollups.findIndex((rollup_obj) => {
+    console.log(`looking for ${acct} in ${JSON.stringify(rollup_obj)}`);
+    return rollup_obj.rollup === acct;
+  });
+  console.log(`rollup findIndex returned: ${rollup_idx}`);
+  if (rollup_idx !== -1) {
     console.log(`acct ${full_acct} is rollup`);
     return true;
   }
@@ -141,55 +143,65 @@ function getRollupChildren(
     .replace("@div@", div_id);
 
   const ret_acct_list: string[] = [];
+  console.log(
+    `begin case evaluation for finding rollupc hildren for ${full_acct}`
+  );
 
   // 1. DIV => go to DEPTS
   if (dept_id === undefined) {
-    for (const dept_id of div_dict[div_id].depts) {
-      ret_acct_list.push(full_acct_no_dept.replace("@dept@", dept_id));
+    console.log("its a div");
+    for (const add_dept_id of div_dict[div_id].depts) {
+      ret_acct_list.push(full_acct_no_dept.replace("@dept@", add_dept_id));
     }
-
+    console.log(`replaced parent with ${ret_acct_list}`);
     return ret_acct_list;
   }
 
   // 2. GROUP => Go to GROUP CHILDREN (DEPTS)
   const group_items = groups.filter((group_obj) => {
-    group_obj.code === dept_id;
+    return group_obj.code === dept_id;
   });
   if (group_items.length > 0) {
-    const ret_acct_list: string[] = [];
+    console.log("its a group");
     for (const grp_child of group_items[0].children) {
       ret_acct_list.push(full_acct_no_dept.replace("@dept@", grp_child));
     }
-
+    console.log(`replaced parent with ${ret_acct_list}`);
     return ret_acct_list;
   }
 
+  console.log("roll down acctrollup=");
   // 3. It's not a GROUP or DIV, so now we roll down the ACCT LEVEL
   const full_acct_no_acct = entity.full_account
-    .replace("@acct@", acct_id)
+    .replace("@dept@", dept_id)
     .replace("@div@", div_id);
   const rollup_items = rollups.filter((rollup_obj) => {
-    rollup_obj.rollup === acct_id;
+    return rollup_obj.rollup === acct_id;
   });
   if (rollup_items.length > 0) {
+    console.log(`found rollup definition: ${JSON.stringify(rollup_items)}`);
+  
     // More rollups?
-    for (const rollup_id of rollup_items[0].child_rollups) {
-      ret_acct_list.push(full_acct_no_acct.replace("@acct@", rollup_id));
-    }
-    if (ret_acct_list.length > 0) {
+    if (rollup_items[0].child_rollups !== undefined) {
+      for (const rollup_id of Object.keys(rollup_items[0].child_rollups)) {
+        console.log("adding rollup child");
+        ret_acct_list.push(full_acct_no_acct.replace("@acct@", rollup_id));
+      }
       // found rollups, we can return now
+      console.log(`replaced parent with ${ret_acct_list}`);
       return ret_acct_list;
     }
 
     // If we get here, the rollup does not have further rollup children, we need to find
     // n-level accounts to return
+    console.log("adding nlevel accts");
     const acct_list = Object.entries(acct_dict).filter(
-      ([acct_id, acct_map]) => acct_map.type === acct_id
+      ([item_acct_id, acct_map]) => acct_map.type === acct_id
     );
     for (const nlevel_acct_id of Object.keys(acct_list)) {
       ret_acct_list.push(full_acct_no_acct.replace("@acct@", nlevel_acct_id));
     }
-
+    console.log(`replaced parent with ${ret_acct_list}`);
     return ret_acct_list;
   }
 
@@ -207,14 +219,19 @@ function resolveRollups(
   acct_dict: entity_model.acctDict,
   groups: entity_model.groupDoc[]
 ): string[] {
-  for (let idx = acct_lst.length - 1; idx >= 0; idx--) {
-    if (acctIsRollup(acct_lst[idx], entity, rollups)) {
-      acct_lst = acct_lst
+  console.log(`running resolveRollups for ${acct_lst}`);
+  let acct_lst_copy = acct_lst;
+  for (let idx = acct_lst_copy.length - 1; idx >= 0; idx--) {
+    if (acctIsRollup(acct_lst_copy[idx], entity, rollups)) {
+      console.log(
+        `detected rollup -- slice and concatenate, call recursively for rollup`
+      );
+      acct_lst_copy = acct_lst_copy
         .slice(0, idx)
         .concat(
           resolveRollups(
             getRollupChildren(
-              acct_lst[idx],
+              acct_lst_copy[idx],
               entity,
               div_dict,
               groups,
@@ -227,9 +244,9 @@ function resolveRollups(
             acct_dict,
             groups
           ),
-          acct_lst.slice(idx + 1)
+          acct_lst_copy.slice(idx + 1)
         );
     }
   }
-  return acct_lst;
+  return acct_lst_copy;
 }

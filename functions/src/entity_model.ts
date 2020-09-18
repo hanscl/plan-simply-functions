@@ -41,14 +41,27 @@ export interface groupDoc {
   code: string;
   level: string;
   name: string;
+  div: string;
 }
 
 export interface rollupDoc {
   level: number;
   n_level: boolean;
   rollup: string;
-  child_rollups: string[];
-  acct_types: string[];
+  child_rollups?: {[k: string]: number};
+  acct_types?: string[];
   accts_add?: string[];
   accts_remove?: string[];
 }
+
+export interface hierDoc {
+  children: hierLevel[];
+}
+
+export interface hierLevel {
+  level: string;
+  name: string;
+  id: string;
+  children?: hierLevel[];
+}
+
