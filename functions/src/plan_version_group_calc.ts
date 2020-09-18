@@ -6,7 +6,7 @@ import * as entity_model from "./entity_model";
 const db = admin.firestore();
 
 export const planVersionGroupCreate = functions.firestore
-  .document("entities/${entityId}/plans/{planId}/versions/{versionId}")
+  .document("entities/{entityId}/plans/{planId}/versions/{versionId}")
   .onUpdate(async (snapshot, context) => {
     try {
       const version_before = snapshot.before.data() as plan_model.versionDoc;

@@ -27,7 +27,7 @@ interface accountForSection {
 const db = admin.firestore();
 
 export const planViewGenerate = functions.firestore
-  .document("entities/${entityId}/plans/{planId}/versions/{versionId}")
+  .document("entities/{entityId}/plans/{planId}/versions/{versionId}")
   .onUpdate(async (snapshot, context) => {
     try {
       const version_before = snapshot.before.data() as plan_model.versionDoc;

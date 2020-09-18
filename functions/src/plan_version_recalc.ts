@@ -29,7 +29,7 @@ interface contextParams {
 const db = admin.firestore();
 
 export const planVersionRecalc = functions.firestore
-  .document("entities/${entityId}/plans/{planId}/versions/{versionId}/dept/{acctId}")
+  .document("entities/{entityId}/plans/{planId}/versions/{versionId}/dept/{acctId}")
   .onUpdate(async (snapshot, context) => {
     try {
       const nlevel_acct_before = snapshot.before.data() as plan_model.accountDoc;

@@ -8,9 +8,15 @@ export const entityHierarchyUpdate = functions.firestore
   .document("entities/{entityId}/entity_structure/{driverDocId}")
   .onWrite(async (snapshot, context) => {
     try {
-      if (context.params.driverDocId === "hier") {
+      if (
+        context.params.driverDocId === "hier" ||
+        context.params.driverDocId === "acct" ||
+        context.params.driverDocId === "rollups"
+      ) {
         // avoid endless updates
-        console.log("Updated hierarchy document itself; exit update function.");
+        console.log(
+          "Updated hierarchy document itself or an document that is not relevant => exit update function."
+        );
         return;
       }
 
@@ -50,7 +56,7 @@ export const entityHierarchyUpdate = functions.firestore
 
       const hier_obj: entity_model.hierDoc = { children: [] };
 
-      for(const div_id of div_list) {
+      for (const div_id of div_list) {
         const div_level: entity_model.hierLevel = {
           level: "div",
           id: div_id,
@@ -84,7 +90,7 @@ export const entityHierarchyUpdate = functions.firestore
 
         // process other depts
         div_dict[div_id].depts.forEach((dept_id) => {
-          if (depts_in_groups.indexOf(dept_id) > -1 ) return;
+          if (depts_in_groups.indexOf(dept_id) > -1) return;
           const dept_level: entity_model.hierLevel = {
             level: "dept",
             id: dept_id,
@@ -97,7 +103,7 @@ export const entityHierarchyUpdate = functions.firestore
         // save to firestore
         doc_path = `entities/${context.params.entityId}/entity_structure/hier`;
         await db.doc(doc_path).set(hier_obj);
-    }
+      }
     } catch (error) {
       console.log(`Error occured during entity hierarchy update: ${error}`);
       return;
