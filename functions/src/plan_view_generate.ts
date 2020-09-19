@@ -624,3 +624,4 @@ async function deleteQueryBatch(
     deleteQueryBatch(query, resolve).catch();
   });
 }
+  
