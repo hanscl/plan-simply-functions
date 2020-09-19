@@ -157,7 +157,7 @@ export const planViewGenerate = functions.firestore
         throw new Error(
           "Could not find Divisions in Entity Structure collection"
         );
-      const div_definitions = div_snap.data() as Record<string, object>;
+      const div_definitions = div_snap.data() as entity_model.divDict;
       const div_list: string[] = Object.keys(div_definitions);
 
       let write_batch = db.batch();
@@ -167,9 +167,14 @@ export const planViewGenerate = functions.firestore
       const cmp_view_doc_ref = await new_view_ref
         .collection("by_org_level")
         .add({ level: "company", filter: ent_no }); // TODO ADD CMP FILTER
-      const div_view_doc_refs: view_model.sectionDocRefDict = {};
+      const view_doc_refs: view_model.sectionDocRefDict = {};
       for (const div_id of div_list) {
-        div_view_doc_refs[div_id] = await new_view_ref
+        for (const dept_id of div_definitions[div_id].depts) {
+          view_doc_refs[dept_id] = await new_view_ref
+            .collection("by_org_level")
+            .add({ level: "dept", filter: dept_id });
+        }
+        view_doc_refs[div_id] = await new_view_ref
           .collection("by_org_level")
           .add({ level: "div", filter: div_id });
       }
@@ -180,10 +185,10 @@ export const planViewGenerate = functions.firestore
         section_pos < pnl_struct_obj.sections.length;
         section_pos++
       ) {
-        const sectionObj = pnl_struct_obj.sections[section_pos];
+        const section_obj = pnl_struct_obj.sections[section_pos];
         // Get the list of divs for the filters
         const section_div_accts: accountForSection[] = [];
-        for (const filterDef of sectionObj.filters) {
+        for (const filterDef of section_obj.filters) {
           const group_acct_snap = await db
             .collection(
               `entities/${context_params.entityId}/plans/${context_params.planId}/versions/${context_params.versionId}/div`
@@ -211,9 +216,9 @@ export const planViewGenerate = functions.firestore
 
         // Create section document for COMPANY & DIVs
         const cmp_view_sect: view_model.viewSection = {
-          name: sectionObj.name,
+          name: section_obj.name,
           position: section_pos,
-          header: sectionObj.header,
+          header: section_obj.header,
           totals_level: "pnl",
           totals_id: pnl_doc_id,
         };
@@ -230,7 +235,7 @@ export const planViewGenerate = functions.firestore
 
           // create view section and add to map object
           div_view_sects[div_id] = await createDivViewSections(
-            sectionObj,
+            section_obj,
             section_pos,
             fltrd_div_accts,
             context_params,
@@ -238,7 +243,10 @@ export const planViewGenerate = functions.firestore
           );
         }
 
-        if (sectionObj.lines) {
+        // create empty object to hold dept sections
+        const dept_view_sects = {} as view_model.viewSectionDict;
+
+        if (section_obj.lines) {
           // we have lines to add; create array in this view section
           cmp_view_sect.lines = [];
 
@@ -251,18 +259,23 @@ export const planViewGenerate = functions.firestore
             // save to lines in parent
             cmp_view_sect.lines.push(curr_line);
             // ... and call the recursive function
+            section_pos;
             await rollDownLevelOrAcct(
               div_line_acct.account,
               curr_line,
+              undefined, //parent_dept_obj => does not exist on this level
               context_params,
-              div_view_sects
+              div_view_sects,
+              dept_view_sects,
+              section_obj,
+              section_pos
             );
           }
         } // END processing lines for section object
 
         //TODO: Remove before PROD deployment
         console.log(
-          `Section ${sectionObj.name} complete ....` +
+          `Section ${section_obj.name} complete ....` +
             JSON.stringify(cmp_view_sect)
         );
         console.log(
@@ -277,8 +290,16 @@ export const planViewGenerate = functions.firestore
         );
         write_ctr++;
         for (const div_id of Object.keys(div_view_sects)) {
+          for (const dept_id of div_definitions[div_id].depts) {
+            if (dept_view_sects[dept_id] !== undefined) {
+              write_batch.set(
+                view_doc_refs[dept_id].collection("sections").doc(),
+                dept_view_sects[dept_id]
+              );
+            }
+          }
           write_batch.set(
-            div_view_doc_refs[div_id].collection("sections").doc(),
+            view_doc_refs[div_id].collection("sections").doc(),
             div_view_sects[div_id]
           );
           write_ctr++;
@@ -297,9 +318,7 @@ export const planViewGenerate = functions.firestore
 
       return;
     } catch (error) {
-      console.log(
-        "Error occured during view generation " + error
-      );
+      console.log("Error occured during view generation " + error);
       return;
     }
   });
@@ -338,8 +357,12 @@ async function createDivViewSections(
 async function rollDownLevelOrAcct(
   parent_acct: plan_model.accountDoc,
   parent_view_obj: view_model.viewChild,
+  parent_dept_obj: view_model.viewSection | undefined,
   context_params: contextParams,
-  div_sections: view_model.viewSectionDict
+  div_sections: view_model.viewSectionDict,
+  dept_sections: view_model.viewSectionDict,
+  section_obj: view_model.pnlSection,
+  section_pos: number
 ) {
   const rollDir: RollDirection = determineRollDirection(
     parent_acct,
@@ -401,21 +424,61 @@ async function rollDownLevelOrAcct(
     // save this account to the array of child accts in the parent object
     parent_view_obj.child_accts.push(curr_child);
 
-    // if we rolled down from DIV then the child needs to be added to the DIV view section as well
+    // if a parent_dept_obj was passed, then we need to add the current child to this new section object as well
+    if (parent_dept_obj !== undefined) {
+      if (parent_dept_obj.lines === undefined) {
+        parent_dept_obj.lines = [];
+      }
+      parent_dept_obj.lines?.push(curr_child);
+    }
+
+    // if we rolled down from DIV then
+    // (i) the child needs to be added to the DIV view section as well
+    // (ii) we need to create a new DEPT section and add it to the dept_view dictionary
+    // (iii) and pass it to the recursive call to ensure the next level down is added to both the div_child and the dept_section
     if (rollDir === RollDirection.Div_fromDivToDeptOrGroup) {
+      // (i)
       if (div_sections[child_acct.div].lines === undefined) {
         div_sections[child_acct.div].lines = [];
       }
       div_sections[child_acct.div].lines?.push(curr_child);
-    }
+      // (ii)
+      const dept_view_sect: view_model.viewSection = {
+        name: section_obj.name,
+        header: section_obj.header,
+        position: section_pos,
+        totals_level: "dept",
+        totals_id: child_acct.full_account,
+      };
+      if (child_acct.dept !== undefined) {
+        dept_sections[child_acct.dept] = dept_view_sect;
+      }
 
-    // recursively call this function with the current child
-    await rollDownLevelOrAcct(
-      child_acct,
-      curr_child,
-      context_params,
-      div_sections
-    );
+      // (iii)
+      await rollDownLevelOrAcct(
+        child_acct,
+        curr_child,
+        dept_view_sect,
+        context_params,
+        div_sections,
+        dept_sections,
+        section_obj,
+        section_pos
+      );
+    } else {
+      // Otherwise, just pass undefined instead of the dept section
+      // recursively call this function with the current child
+      await rollDownLevelOrAcct(
+        child_acct,
+        curr_child,
+        undefined,
+        context_params,
+        div_sections,
+        dept_sections,
+        section_obj,
+        section_pos
+      );
+    }
   }
 }
 
