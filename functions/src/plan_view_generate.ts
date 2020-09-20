@@ -218,13 +218,16 @@ export const planViewGenerate = functions.firestore
         );
 
         // Create section document for COMPANY & DIVs
-        const cmp_view_sect: view_model.viewSection = {
-          name: section_obj.name,
-          position: section_pos,
-          header: section_obj.header,
-          totals_level: "pnl",
-          totals_id: pnl_doc_id,
-        };
+        let cmp_view_sect: view_model.viewSection | undefined = undefined;
+        if (section_obj.org_levels.includes("entity")) {
+          cmp_view_sect = {
+            name: section_obj.name,
+            position: section_pos,
+            header: section_obj.header,
+            totals_level: "pnl",
+            totals_id: pnl_doc_id,
+          };
+        }
 
         // create empty object to hold dept sections
         const dept_view_sects = {} as view_model.viewSectionDict;
@@ -265,7 +268,7 @@ export const planViewGenerate = functions.firestore
 
         if (section_obj.lines) {
           // we have lines to add; create array in this view section
-          cmp_view_sect.lines = [];
+          if (cmp_view_sect !== undefined) cmp_view_sect.lines = [];
 
           for (const div_line_acct of section_div_accts) {
             const curr_line: view_model.viewChild = {
@@ -274,7 +277,11 @@ export const planViewGenerate = functions.firestore
               desc: div_line_acct.account.divdept_name,
             };
             // save to lines in parent
-            cmp_view_sect.lines.push(curr_line);
+            if (
+              cmp_view_sect !== undefined &&
+              cmp_view_sect.lines !== undefined
+            )
+              cmp_view_sect.lines.push(curr_line);
             // ... and call the recursive function
             section_pos;
             await rollDownLevelOrAcct(
@@ -291,25 +298,31 @@ export const planViewGenerate = functions.firestore
         } // END processing lines for section object
 
         // Add to BATCH & intermittent write
-        write_batch.set(
-          cmp_view_doc_ref.collection("sections").doc(),
-          cmp_view_sect
-        );
+        if (cmp_view_sect !== undefined) {
+          write_batch.set(
+            cmp_view_doc_ref.collection("sections").doc(),
+            cmp_view_sect
+          );
+        }
         write_ctr++;
         for (const div_id of Object.keys(div_view_sects)) {
-          for (const dept_id of div_definitions[div_id].depts) {
-            if (dept_view_sects[dept_id] !== undefined) {
-              write_batch.set(
-                view_doc_refs[dept_id].collection("sections").doc(),
-                dept_view_sects[dept_id]
-              );
+          if (section_obj.org_levels.includes("dept")) {
+            for (const dept_id of div_definitions[div_id].depts) {
+              if (dept_view_sects[dept_id] !== undefined) {
+                write_batch.set(
+                  view_doc_refs[dept_id].collection("sections").doc(),
+                  dept_view_sects[dept_id]
+                );
+              }
             }
           }
-          write_batch.set(
-            view_doc_refs[div_id].collection("sections").doc(),
-            div_view_sects[div_id]
-          );
-          write_ctr++;
+          if (section_obj.org_levels.includes("div")) {
+            write_batch.set(
+              view_doc_refs[div_id].collection("sections").doc(),
+              div_view_sects[div_id]
+            );
+            write_ctr++;
+          }
         }
 
         if (write_ctr > 400) {
@@ -391,7 +404,7 @@ async function createDeptViewSection(
       ...compnts,
       dept: dept_id,
     });
-  
+
     const doc_path = `entities/${context_params.entityId}/plans/${context_params.planId}/versions/${context_params.versionId}/dept/${full_account_dept}`;
     const acct_snap = await db.doc(doc_path).get();
     if (acct_snap.exists) {
@@ -495,7 +508,7 @@ async function rollDownLevelOrAcct(
       parent_dept_obj.lines?.push(curr_child);
     }
 
-    // if we rolled down from DIV then (i) the child needs to be added to the DIV view section as well and 
+    // if we rolled down from DIV then (i) the child needs to be added to the DIV view section as well and
     // (ii) we need to find the DEPT section and pass it to the recursive function call to ensure that
     // the next level down is added to both the div_child and the dept_section
     if (rollDir === RollDirection.Div_fromDivToDeptOrGroup) {
