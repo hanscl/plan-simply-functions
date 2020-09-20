@@ -11,7 +11,7 @@ export const entityHierarchyUpdate = functions.firestore
       if (
         context.params.driverDocId === "hier" ||
         context.params.driverDocId === "acct" ||
-        context.params.driverDocId === "rollups"
+        context.params.driverDocId === "rollups" 
       ) {
         // avoid endless updates
         console.log(
@@ -40,19 +40,19 @@ export const entityHierarchyUpdate = functions.firestore
       }
       const dept_dict = dept_snapshot.data() as entity_model.deptDict;
 
-      // get default group path
-      const coll_path = `entities/${context.params.entityId}/account_rollups`;
-      const rollup_snap = await db
-        .collection(coll_path)
-        .where("default", "==", true)
+      // get group doc
+      doc_path = `entities/${context.params.entityId}/entity_structure/group`;
+      const group_snap = await db
+        .doc(doc_path)
         .get();
-      if (rollup_snap.empty) {
+      if (!group_snap.exists) {
         console.log(
-          `Could not find default account rollup document at: ${coll_path}`
+          `Could not find group document at: ${doc_path}`
         );
         return;
       }
-      const group_coll_ref = rollup_snap.docs[0].ref.collection("groups");
+      const group_list = (group_snap.data() as entity_model.groupDoc).groups
+     // const group_coll_ref = rollup_snap.docs[0].ref.collection("groups");
 
       const hier_obj: entity_model.hierDoc = { children: [] };
 
@@ -64,12 +64,13 @@ export const entityHierarchyUpdate = functions.firestore
           children: [],
         };
         // first: add dept groups if there are any
-        const group_snap = await group_coll_ref
-          .where("div", "==", div_id)
-          .get();
+        // const group_snap = await group_coll_ref
+        //   .where("div", "==", div_id)
+        //   .get();
         const depts_in_groups: string[] = [];
-        group_snap.forEach((group_doc) => {
-          const group_obj = group_doc.data() as entity_model.groupDoc;
+        const group_list_for_div = group_list.filter(item => item.div === div_id);
+        group_list_for_div.forEach((group_obj) => {
+          //const group_obj = group_doc.data() as entity_model.groupObj;
           const group_level: entity_model.hierLevel = {
             id: group_obj.code,
             name: group_obj.name,

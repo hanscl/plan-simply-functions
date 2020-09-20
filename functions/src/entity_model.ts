@@ -37,12 +37,16 @@ export type divDict = {
   [k: string]: divMap;
 };
 
-export interface groupDoc {
+export interface groupObj {
   children: string[];
   code: string;
   level: string;
   name: string;
   div: string;
+}
+
+export interface groupDoc {
+  groups: groupObj[];
 }
 
 export interface acctComponents {
@@ -51,7 +55,7 @@ export interface acctComponents {
   acct: string;
 }
 
-export interface rollupDoc {
+export interface rollupObj {
   level: number;
   n_level: boolean;
   rollup: string;
@@ -59,6 +63,17 @@ export interface rollupDoc {
   acct_types?: string[];
   accts_add?: string[];
   accts_remove?: string[];
+}
+
+export interface rollupSummaryDoc {
+  name: string;
+  max_level: number;
+  items: rollupNameMap[];
+}
+
+export interface rollupNameMap {
+  name: string;
+  code: string;
 }
 
 export interface hierDoc {

@@ -45,7 +45,7 @@ export const planVersionGroupCreate = functions.firestore
       // save company number for full_account
       const entity_snap = await db.doc(`entities/${entityId}`).get();
       if (!entity_snap.exists) {
-        console.log("could not read entityd document");
+        console.log("could not read entity document");
         return;
       }
 
@@ -53,26 +53,29 @@ export const planVersionGroupCreate = functions.firestore
 
       // get a list of rollups
       const rollup_snap = await db
-        .doc(`entities/${entityId}/entity_structure/rollups`)
+        .doc(`entities/${entityId}/entity_structure/rollup`)
         .get();
 
       if (!rollup_snap.exists) {
-        console.log("No rollup defined in entity structure");
+        console.log("No rollup document defined in entity structure");
         return;
       }
 
-      const rollup_definitions = rollup_snap.data() as Record<string, string>;
-      const rollup_list = Object.keys(rollup_definitions);
+   // const rollup_definitions = rollup_snap.data() as Record<string, string>;
+      
+      const rollup_doc = rollup_snap.data() as entity_model.rollupSummaryDoc
+      const rollup_list: string[] = [];
+      rollup_doc.items.forEach(rollupNameMap => rollup_list.push(rollupNameMap.code));
 
-      const rollup_docid = (plan_snapshot.data() as plan_model.planDoc).account_rollup;
+      //const rollup_docid = (plan_snapshot.data() as plan_model.planDoc).account_rollup;
 
-      const groups_snapshot = await db
-        .collection(
-          `entities/${entityId}/account_rollups/${rollup_docid}/groups`
+      const group_snapshot = await db
+        .doc(
+          `entities/${entityId}/entity_structure/group`
         )
         .get();
 
-      if (groups_snapshot.empty) {
+      if (!group_snapshot.exists) {
         console.log("No group definitions found in rollups");
         return;
       }
@@ -80,8 +83,9 @@ export const planVersionGroupCreate = functions.firestore
       let group_wx_batch = db.batch();
       let group_ctr = 0;
 
-      for (const group_doc of groups_snapshot.docs) {
-        const group_obj = group_doc.data() as entity_model.groupDoc;
+      const group_list = (group_snapshot.data() as entity_model.groupDoc).groups;
+      for (const group_obj of group_list) {
+        //const group_obj = group_doc.data() as entity_model.groupDoc;
         console.log("processing group doc with code: " + group_obj.code);
 
         for (const rollup_acct of rollup_list) {
@@ -139,12 +143,14 @@ export const planVersionGroupCreate = functions.firestore
           }
 
           // build the group account obj and add to batch
+          const rollup_name_map = rollup_doc.items.find(item => item.code === rollup_acct);
+          if(rollup_name_map === undefined) throw new Error(`Unable to find name for rollup ${rollup_name_map}`);
           const group_acct: plan_model.accountDoc = {
             acct: rollup_acct,
             class: "rollup",
             div: acct_div,
             full_account: full_account,
-            acct_name: rollup_definitions[rollup_acct],
+            acct_name: rollup_name_map.name,
             divdept_name: group_obj.name,
             group: true,
             is_group_child: false,

@@ -25,10 +25,6 @@ interface accountForSection {
   account: plan_model.accountDoc;
 }
 
-interface groupListDoc {
-  groups: entity_model.groupDoc[];
-}
-
 const db = admin.firestore();
 
 export const planViewGenerate = functions.firestore
@@ -128,7 +124,7 @@ export const planViewGenerate = functions.firestore
       // find n-level rollups
       const rollup_doc_snap = await db
         .collection(
-          `entities/${context_params.entityId}/account_rollups/${plan_obj.account_rollup}/rollups`
+          `entities/${context_params.entityId}/entity_structure/rollup/rollups`
         )
         .where("n_level", "==", true)
         .get();
@@ -139,7 +135,7 @@ export const planViewGenerate = functions.firestore
         );
 
       for (const rollup_def_doc of rollup_doc_snap.docs) {
-        const rollup_def_obj = rollup_def_doc.data() as entity_model.rollupDoc;
+        const rollup_def_obj = rollup_def_doc.data() as entity_model.rollupObj;
         context_params.n_level_rollups.push(rollup_def_obj.rollup);
       }
 
@@ -168,12 +164,12 @@ export const planViewGenerate = functions.firestore
       const div_list: string[] = Object.keys(div_definitions);
 
       // get list of groups for the entity
-      let groups_list: entity_model.groupDoc[] = [];
+      let groups_list: entity_model.groupObj[] = [];
       const group_snap = await db
         .doc(`entities/${context_params.entityId}/entity_structure/group`)
         .get();
       if (group_snap.exists) {
-        groups_list = (group_snap.data() as groupListDoc).groups;
+        groups_list = (group_snap.data() as entity_model.groupDoc).groups;
       }
 
       let write_batch = db.batch();
