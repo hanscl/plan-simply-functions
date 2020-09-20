@@ -4,6 +4,7 @@ export interface entityDoc {
   number?: string;
   legal?: string;
   full_account: string;
+  div_account?: string;
   full_account_export: string;
   acct_type_flip_sign?: string[];
 }
@@ -44,13 +45,17 @@ export interface groupDoc {
   div: string;
 }
 
-
+export interface acctComponents {
+  dept?: string;
+  div: string;
+  acct: string;
+}
 
 export interface rollupDoc {
   level: number;
   n_level: boolean;
   rollup: string;
-  child_rollups?: {[k: string]: number};
+  child_rollups?: { [k: string]: number };
   acct_types?: string[];
   accts_add?: string[];
   accts_remove?: string[];
@@ -66,4 +71,3 @@ export interface hierLevel {
   id: string;
   children?: hierLevel[];
 }
-
