@@ -291,11 +291,6 @@ export const planViewGenerate = functions.firestore
           const groups_for_div = groups_list.filter(
             (group_item) => group_item.div === div_id
           );
-          console.log(
-            `${section_obj.name} :: found ${
-              groups_for_div.length
-            } groups: ${JSON.stringify(groups_for_div)}`
-          );
           for (const group_obj of groups_for_div) {
             const new_dept_sect = await createDeptViewSection(
               section_obj,
@@ -306,20 +301,10 @@ export const planViewGenerate = functions.firestore
               group_obj.code,
               full_acct_formats
             );
-            console.log(
-              `group ${JSON.stringify(group_obj)} resulted in ${JSON.stringify(
-                new_dept_sect
-              )} from createDeptViewSection`
-            );
-
             if (new_dept_sect !== undefined)
               dept_view_sects[group_obj.code] = new_dept_sect;
           }
         }
-
-        console.log(
-          `dept view sections are: ${JSON.stringify(dept_view_sects)}`
-        );
 
         if (section_obj.lines) {
           // we have lines to add; create array in this view section
@@ -345,9 +330,7 @@ export const planViewGenerate = functions.firestore
               undefined, //parent_dept_obj => does not exist on this level
               context_params,
               div_view_sects,
-              dept_view_sects,
-              section_obj,
-              section_pos
+              dept_view_sects
             );
           }
         } // END processing lines for section object
@@ -509,9 +492,7 @@ async function rollDownLevelOrAcct(
   parent_dept_obj: view_model.viewSection | undefined,
   context_params: contextParams,
   div_sections: view_model.viewSectionDict,
-  dept_sections: view_model.viewSectionDict,
-  section_obj: view_model.pnlSection, // TODO: REMOVE
-  section_pos: number
+  dept_sections: view_model.viewSectionDict
 ) {
   const rollDir: RollDirection = determineRollDirection(
     parent_acct,
@@ -568,12 +549,6 @@ async function rollDownLevelOrAcct(
     // save this account to the array of child accts in the parent object
     parent_view_obj.child_accts.push(curr_child);
 
-    console.log(
-      `called recursive function with parent_dept_obj ${JSON.stringify(
-        parent_dept_obj
-      )}`
-    );
-
     // if a parent_dept_obj was passed, then we need to add the current child to this new section object as well
     if (parent_dept_obj !== undefined) {
       if (parent_dept_obj.lines === undefined) {
@@ -582,27 +557,23 @@ async function rollDownLevelOrAcct(
       parent_dept_obj.lines?.push(curr_child);
     }
 
-    console.log(`parent_dept_obj UPDATED: ${JSON.stringify(parent_dept_obj)}`);
-
     // if we rolled down from DIV then (i) the child needs to be added to the DIV view section as well and
     // (ii) we need to find the DEPT section and pass it to the recursive function call to ensure that
     // the next level down is added to both the div_child and the dept_section
 
-    if (rollDir === RollDirection.Div_fromDivToDeptOrGroup) {
-      // (i) Add DIV line to the VIEW SECTION object
-      if (div_sections[child_acct.div].lines === undefined) {
-        div_sections[child_acct.div].lines = [];
+    if (
+      rollDir === RollDirection.Div_fromDivToDeptOrGroup ||
+      rollDir === RollDirection.Dept_fromGroupToDept
+    ) {
+      // only if coming FROM div add to DIV as well
+      if (rollDir === RollDirection.Div_fromDivToDeptOrGroup) {
+        // (i) Add DIV line to the VIEW SECTION object
+        if (div_sections[child_acct.div].lines === undefined) {
+          div_sections[child_acct.div].lines = [];
+        }
+        div_sections[child_acct.div].lines?.push(curr_child);
       }
-      div_sections[child_acct.div].lines?.push(curr_child);
-      // (ii) Pass DEPT section to recursive call to attach the lower levels to the DEPT view section object
-      console.log(`DivToDept :: Child Account DEPT is ${child_acct.dept}`);
-      if (child_acct.dept !== undefined) {
-        console.log(
-          `DivToDept :: dept_section_obj is ${JSON.stringify(
-            dept_sections[child_acct.dept]
-          )}`
-        );
-      }
+      // IN BOTH CASES: (ii) Pass DEPT section to recursive call to attach the lower levels to the DEPT view section object
       await rollDownLevelOrAcct(
         child_acct,
         curr_child,
@@ -611,9 +582,7 @@ async function rollDownLevelOrAcct(
           : dept_sections[child_acct.dept],
         context_params,
         div_sections,
-        dept_sections,
-        section_obj,
-        section_pos
+        dept_sections
       );
     } else {
       // Otherwise, just pass undefined instead of the dept section and recursively call this function with the current child
@@ -623,9 +592,7 @@ async function rollDownLevelOrAcct(
         undefined,
         context_params,
         div_sections,
-        dept_sections,
-        section_obj,
-        section_pos
+        dept_sections
       );
     }
   }
