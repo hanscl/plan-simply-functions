@@ -1,3 +1,5 @@
+import * as entity_model from "./entity_model";
+
 export function extractAcctFromFullAccount(
   full_acct: string,
   format_coll: string[],
@@ -22,7 +24,7 @@ export function extractAcctFromFullAccount(
   // find param in placeholder
   const acct_begin_idx = placeholder.indexOf(search_str);
   if (acct_begin_idx === -1) {
-    undefined;
+    return undefined;
   }
   const string_before_acct = placeholder.substring(0, acct_begin_idx);
 
@@ -48,4 +50,48 @@ export function extractAcctFromFullAccount(
   const acct = full_acct.substring(dot_begin_pos + 1, dot_end_pos);
 
   return acct;
+}
+
+export function buildFullAccountString(
+  format_str: string[],
+  components: entity_model.acctComponents
+) {
+
+  const cmp_cnt = components.dept === undefined ? 3 : 4
+
+  // find the correct placeholder string
+  let placeholder = "";
+  for(const pclhld of format_str) {
+    if(pclhld.split(".").length === cmp_cnt) {
+      placeholder = pclhld;
+      break;
+    }
+  }
+
+  let ret_str = placeholder
+    .replace("@acct@", components.acct)
+    .replace("@div@", components.div);
+  if (components.dept !== undefined) {
+    ret_str = ret_str.replace("@dept@", components.dept);
+  } else {
+    ret_str = ret_str.replace(".@dept@", "");
+  }
+
+  return ret_str;
+}
+
+export function extractComponentsFromFullAccountString(
+  full_account: string,
+  format_coll: string[]
+): entity_model.acctComponents {
+
+  const div = extractAcctFromFullAccount(full_account, format_coll, "div");
+  const acct = extractAcctFromFullAccount(full_account, format_coll, "acct");
+  const dept = extractAcctFromFullAccount(full_account, format_coll, "dept");
+
+  return {
+    div: div === undefined ? "" : div,
+    dept: dept,
+    acct: acct === undefined ? "" : acct,
+  };
 }

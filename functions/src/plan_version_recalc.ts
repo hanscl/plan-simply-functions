@@ -29,13 +29,15 @@ interface contextParams {
 const db = admin.firestore();
 
 export const planVersionRecalc = functions.firestore
-  .document("entities/{entityId}/plans/{planId}/versions/{versionId}/dept/{acctId}")
+  .document(
+    "entities/{entityId}/plans/{planId}/versions/{versionId}/dept/{acctId}"
+  )
   .onUpdate(async (snapshot, context) => {
     try {
       const nlevel_acct_before = snapshot.before.data() as plan_model.accountDoc;
       const nlevel_acct_after = snapshot.after.data() as plan_model.accountDoc;
       const context_params = {
-        entityId: context.params.entityId, 
+        entityId: context.params.entityId,
         planId: context.params.planId,
         versionId: context.params.versionId,
       };
@@ -185,6 +187,14 @@ async function updateParentAccounts(
         ret_acct_obj = acct_obj;
         // also try to find group accounts and process those
         await updateGroupAccounts(
+          context_params,
+          parent_acct.acct_id,
+          update_batch,
+          batch_counter,
+          acct_changes
+        );
+        // also process P&L accounts
+        await updatePnlAggregates(
           context_params,
           parent_acct.acct_id,
           update_batch,
