@@ -16,7 +16,7 @@ export interface acctMap {
 }
 
 export interface deptMap {
-  div: string;
+  div?: string;
   name: string;
 }
 
