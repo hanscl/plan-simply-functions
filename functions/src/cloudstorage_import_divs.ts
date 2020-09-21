@@ -24,7 +24,7 @@ export const importDivisionsFromCsv = functions.storage
 
       console.log(`File upload detected: ${fileName}`);
 
-      // Attempt to parse file name and confirm that the file uploaded was a dept file
+      // Attempt to parse file name and confirm that the file uploaded was a div file
       const file_without_ext = fileName.split(".")[0];
       if (file_without_ext !== "divs") {
         console.log("this file is not for me :(");
