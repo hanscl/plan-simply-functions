@@ -9,3 +9,4 @@ export { entityHierarchyUpdate } from "./entity_update_hier";
 
 // FIle Handling
 export { importDepartmentsFromCsv } from "./cloudstorage_import_depts";
+export { importDivisionsFromCsv } from "./cloudstorage_import_divs";
