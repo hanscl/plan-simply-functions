@@ -151,6 +151,7 @@ export const importAccountsFromCsv = functions.storage
             acct_dict
           )}`
         );
+        await db.doc(`entities/${entity_doc.id}/entity_structure/acct`).set(acct_dict);
       }
     } catch (error) {
       console.log("Error occured after file uploaded to bucket: " + error);
