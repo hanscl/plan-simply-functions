@@ -32,10 +32,13 @@ export const importDivisionsFromCsv = functions.storage
       }
 
       const csv = require("csv-parser");
+      const stripBom = require("strip-bom-stream");
+
       const div_rows: div_row[] = [];
       const stream = bucket
         .file(filePath)
         .createReadStream()
+        .pipe(stripBom())
         .pipe(csv())
         .on("data", (data: div_row) => div_rows.push(data));
 
@@ -43,6 +46,8 @@ export const importDivisionsFromCsv = functions.storage
         stream.on("end", resolve);
         stream.on("error", reject);
       });
+
+      console.log(`DIV ROWS: `)
 
       // split the array for each
       div_rows.forEach((row) => {

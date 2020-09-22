@@ -18,7 +18,6 @@ export const importDepartmentsFromCsv = functions.storage
       const bucket = admin.storage().bucket(object.bucket);
       const filePath = object.name;
       const fileName = filePath?.split("/").pop();
-      //  const bucketDir = path.dirname(filePath);
 
       if (fileName === undefined || filePath === undefined)
         throw new Error("could not extract filename");
@@ -28,7 +27,7 @@ export const importDepartmentsFromCsv = functions.storage
       // Attempt to parse file name and confirm that the file uploaded was a dept file
       const file_without_ext = fileName.split(".")[0];
       const parts = file_without_ext.split("-");
-      if (parts.length !== 2 || parts[0] !== "dept") {
+      if (parts.length !== 2 || parts[0] !== "depts") {
         console.log("this file is not for me :(");
         return;
       }
@@ -46,12 +45,13 @@ export const importDepartmentsFromCsv = functions.storage
       console.log(`Processing dept upload for entity ${parts[1]}`);
 
       const csv = require("csv-parser");
-      //  const fs = require("fs");
+      const stripBom = require("strip-bom-stream");
 
       const dept_rows: dept_row[] = [];
       const stream = bucket
         .file(filePath)
         .createReadStream()
+        .pipe(stripBom())
         .pipe(csv())
         .on("data", (data: dept_row) => dept_rows.push(data));
 

@@ -1,8 +1,8 @@
 export interface entityDoc {
   children?: string[];
   name: string;
-  number?: string;
-  legal?: string;
+  number: string;
+  legal: string;
   full_account: string;
   div_account?: string;
   full_account_export: string;
