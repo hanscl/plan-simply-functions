@@ -1,6 +1,7 @@
 {
   "projects": {
     "prod": "plan-simply",
-    "dev": "plan-simply-dmdev"
+    "dev": "plan-simply-dmdev",
+    "default": "plan-simply-dmdev"
   }
 }

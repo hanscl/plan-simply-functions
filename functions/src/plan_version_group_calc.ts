@@ -38,7 +38,7 @@ export const planVersionGroupCreate = functions.firestore
         .get();
 
       if (!plan_snapshot.exists) {
-        console.log("No rollup document found in plan doc");
+        console.log("No plan document found in plan doc");
         return;
       }
 
@@ -76,7 +76,7 @@ export const planVersionGroupCreate = functions.firestore
         .get();
 
       if (!group_snapshot.exists) {
-        console.log("No group definitions found in rollups");
+        console.log("No group definitions found");
         return;
       }
 
@@ -96,6 +96,9 @@ export const planVersionGroupCreate = functions.firestore
             .where("acct", "==", rollup_acct)
             .where(group_obj.level, "in", group_obj.children)
             .get();
+
+          // skip if no child accounts for this rollup
+          if(acct_snapshot.empty) continue;
 
           let total = 0;
           const values = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
