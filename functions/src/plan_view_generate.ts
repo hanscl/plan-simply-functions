@@ -219,7 +219,7 @@ export const planViewGenerate = functions.firestore
             .where("acct", "==", filterDef.rollup)
             .get();
 
-          if (group_acct_snap.empty) return;
+          if (group_acct_snap.empty) continue;
 
           // save all div accts for this filter
           for (const acct_doc of group_acct_snap.docs) {
@@ -332,6 +332,7 @@ export const planViewGenerate = functions.firestore
         } // END processing lines for section object
 
         // Add to BATCH & intermittent write
+
         if (cmp_view_sect !== undefined) {
           write_batch.set(
             cmp_view_doc_ref.collection("sections").doc(),
@@ -405,6 +406,8 @@ async function createDivViewSection(
     position: section_pos,
   };
 
+  console.log(`creating div view section`);
+
   // if we have more than one account for this division => create a custom PNL aggregate
   // otherwise, just reference this div account
   if (fltrd_div_accts.length > 1) {
@@ -438,7 +441,6 @@ async function createDeptViewSection(
     header: section_obj.header,
     position: section_pos,
   };
-
   // create dept accounts collection from div
   //  for(const acct_for_sect of fltrd_div_accts)
   const fltrd_dept_accts: accountForSection[] = [];
@@ -494,7 +496,6 @@ async function rollDownLevelOrAcct(
     parent_acct,
     context_params.n_level_rollups
   );
-
   if (rollDir === RollDirection.Dept_None) return;
 
   // query the child accounts based on the rolldirection
