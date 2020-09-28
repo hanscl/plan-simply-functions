@@ -73,16 +73,23 @@ export const writeUserAccount = functions.firestore
       const user_after = snapshot.after.data() as userDoc;
       const userId = context.params.userId;
 
-      /*** read entities first */
-      const read_entities_changed = await compareEntities(
-        user_before.entities_read,
-        user_after.entities_read
-      );
+      //console.log(`user_before object: ${JSON.stringify(user_before)}`);
+      //console.log(`user_after object: ${JSON.stringify(user_after)}`);
 
-      const write_entities_changed = await compareEntities(
-        user_before.entities_write,
-        user_after.entities_write
-      );
+      let read_entities_changed = false;
+      let write_entities_changed = false;
+      /*** read entities first */
+      if (user_before !== undefined) {
+        read_entities_changed = await compareEntities(
+          user_before.entities_read,
+          user_after.entities_read
+        );
+
+        write_entities_changed = await compareEntities(
+          user_before.entities_write,
+          user_after.entities_write
+        );
+      }
 
       if (read_entities_changed || write_entities_changed) {
         /*** at least entfity array was updated; write to database */
