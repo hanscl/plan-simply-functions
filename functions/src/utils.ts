@@ -1,5 +1,10 @@
 import * as entity_model from "./entity_model";
 
+export enum ReplacePosition {
+  start = 0,
+  end = -1,
+}
+
 export function extractAcctFromFullAccount(
   full_acct: string,
   format_coll: string[],
@@ -56,13 +61,12 @@ export function buildFullAccountString(
   format_str: string[],
   components: entity_model.acctComponents
 ) {
-
-  const cmp_cnt = components.dept === undefined ? 3 : 4
+  const cmp_cnt = components.dept === undefined ? 3 : 4;
 
   // find the correct placeholder string
   let placeholder = "";
-  for(const pclhld of format_str) {
-    if(pclhld.split(".").length === cmp_cnt) {
+  for (const pclhld of format_str) {
+    if (pclhld.split(".").length === cmp_cnt) {
       placeholder = pclhld;
       break;
     }
@@ -84,7 +88,6 @@ export function extractComponentsFromFullAccountString(
   full_account: string,
   format_coll: string[]
 ): entity_model.acctComponents {
-
   const div = extractAcctFromFullAccount(full_account, format_coll, "div");
   const acct = extractAcctFromFullAccount(full_account, format_coll, "acct");
   const dept = extractAcctFromFullAccount(full_account, format_coll, "dept");
@@ -94,4 +97,21 @@ export function extractComponentsFromFullAccountString(
     dept: dept,
     acct: acct === undefined ? "" : acct,
   };
+}
+
+export function substituteEntityForRollup(
+  origText: string,
+  pos: ReplacePosition,
+  entityId: string
+): string {
+  if (pos === ReplacePosition.end) {
+    return `${origText.substring(
+      0,
+      origText.length - entityId.length
+    )}${entityId}`;
+  } else if (pos === ReplacePosition.start) {
+    return `${entityId}${origText.substring(entityId.length)}`;
+  }
+
+  return "";
 }

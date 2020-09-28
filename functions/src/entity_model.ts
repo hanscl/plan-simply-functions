@@ -7,6 +7,13 @@ export interface entityDoc {
   div_account?: string;
   full_account_export: string;
   acct_type_flip_sign?: string[];
+  type: string;
+  entity_embeds?: entityEmbed[]; 
+}
+
+export interface entityEmbed {
+  field: string;
+  pos: number;
 }
 
 export interface acctMap {
@@ -78,6 +85,7 @@ export interface rollupNameMap {
 
 export interface hierDoc {
   children: hierLevel[];
+  ready_for_rollup?: boolean;
 }
 
 export interface hierLevel {

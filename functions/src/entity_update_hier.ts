@@ -11,7 +11,7 @@ export const entityHierarchyUpdate = functions.firestore
       if (
         context.params.driverDocId === "hier" ||
         context.params.driverDocId === "acct" ||
-        context.params.driverDocId === "rollups"
+        context.params.driverDocId === "rollup"
       ) {
         // avoid endless updates
         console.log(
@@ -50,6 +50,11 @@ export const entityHierarchyUpdate = functions.firestore
         group_list = (group_snap.data() as entity_model.groupDoc).groups;
       }
       // const group_coll_ref = rollup_snap.docs[0].ref.collection("groups");
+
+      // begin update - set flag for entity rollup to false
+      await db
+        .doc(`entities/${context.params.entityId}/entity_structure/hier`)
+        .set({ ready_for_rollup: false }, { merge: true });
 
       const hier_obj: entity_model.hierDoc = { children: [] };
 
@@ -101,6 +106,9 @@ export const entityHierarchyUpdate = functions.firestore
           div_level.children?.push(dept_level);
         });
         hier_obj.children.push(div_level);
+
+        // set flag so that the hierarchy can be processed by any rollup entities
+        hier_obj.ready_for_rollup = true;
 
         // save to firestore
         doc_path = `entities/${context.params.entityId}/entity_structure/hier`;
