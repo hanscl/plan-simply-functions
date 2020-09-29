@@ -18,6 +18,7 @@ export interface versionDoc {
   calculated: boolean;
   pnl_structure_id: string;
   ready_for_view?: boolean;
+  child_version_ids: string[];
 }
 
 interface viewTotal {
