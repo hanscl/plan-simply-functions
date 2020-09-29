@@ -306,51 +306,6 @@ export const updateRollupEntityVersion = functions.firestore
     }
   });
 
-// async function getChildAccount(
-//   acct_id: string,
-//   dept_id: string,
-//   child_version: childVersion,
-//   entity_embeds: entity_model.entityEmbed[] | undefined
-// ) {
-//   console.log(
-//     `entering get Child Account for ${acct_id} and ${dept_id} with child version ${child_version} and embeds map ${entity_embeds}`
-//   );
-//   let fltrd_dept_embeds = undefined;
-//   if (entity_embeds !== undefined) {
-//     // find entity embed definition for dept
-//     fltrd_dept_embeds = entity_embeds.filter((embed_map) => {
-//       return embed_map.field === "dept";
-//     });
-//   }
-
-//   let subst_dept_id = dept_id;
-//   if (fltrd_dept_embeds !== undefined && fltrd_dept_embeds.length > 0) {
-//     console.log(`calling utils.substitute for dept_id ${dept_id}`);
-//     // fix the dept string using utils.
-//     subst_dept_id = utils.substituteEntityForRollup(
-//       dept_id,
-//       fltrd_dept_embeds[0].pos,
-//       child_version.entity_no
-//     );
-//     console.log(`substituted dept_id is ${subst_dept_id}`);
-//   }
-//   // query the dept collection of the child version
-//   const child_acct_snap = await child_version.ref
-//     .collection("dept")
-//     .where("acct", "==", acct_id)
-//     .where("dept", "==", subst_dept_id)
-//     .get();
-//   if (child_acct_snap.empty) {
-//     console.log(
-//       `Could not find acct ${acct_id} with dept ${subst_dept_id} for version ${JSON.stringify(
-//         child_version.data
-//       )} >> non-fatal - return to caller`
-//     );
-//     return undefined;
-//   }
-//   //should only be ONE account => return first one
-//   return child_acct_snap.docs[0].data() as plan_model.accountDoc;
-// }
 
 function addAccountValues(
   baseAccount: plan_model.accountDoc,
