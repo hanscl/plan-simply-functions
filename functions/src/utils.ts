@@ -101,15 +101,24 @@ export function extractComponentsFromFullAccountString(
 
 export function substituteEntityForRollup(
   origText: string,
-  pos: ReplacePosition,
+  embed_maps: entity_model.entityEmbed[] | undefined,
   entityId: string
 ): string {
-  if (pos === ReplacePosition.end) {
+  if(embed_maps === undefined) return origText;
+
+  const fltrd_dept_embeds = embed_maps.filter((embed_map) => {
+    return embed_map.field === "dept";
+  });
+
+  if (fltrd_dept_embeds.length < 1) return origText;
+
+
+  if (fltrd_dept_embeds[0].pos === ReplacePosition.end) {
     return `${origText.substring(
       0,
       origText.length - entityId.length
     )}${entityId}`;
-  } else if (pos === ReplacePosition.start) {
+  } else if (fltrd_dept_embeds[0].pos === ReplacePosition.start) {
     return `${entityId}${origText.substring(entityId.length)}`;
   }
 

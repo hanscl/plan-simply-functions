@@ -90,7 +90,11 @@ export const planVersionRecalc = functions.firestore
       nlevel_acct_after.total += +diffTotal;
 
       // call update to rollup entity, if any
-      updateAccountInRollupEntities(context_params, nlevel_acct_after, acct_changes);
+      await updateAccountInRollupEntities(
+        context_params,
+        nlevel_acct_after,
+        acct_changes
+      );
 
       // create a new batch and add n-level account changes
       let acct_update_batch = db.batch();
@@ -304,6 +308,7 @@ async function updateAccountInRollupEntities(
   nlevel_acct_after: plan_model.accountDoc,
   acct_changes: acctChanges
 ) {
+  console.log(`Updating account in rollup entity if needed`);
   // get the entity doc of the one that was changed initially
   const entity_snap = await db.doc(`entities/${context_params.entityId}`).get();
   if (!entity_snap.exists)
@@ -312,11 +317,14 @@ async function updateAccountInRollupEntities(
     );
   const entity_obj = entity_snap.data() as entity_model.entityDoc;
 
-  // If this version is also used in a rollup entity => update that account as well
+  // Find rollup entities for this entity
   const rollup_ent_snaps = await db
     .collection(`entities`)
     .where("type", "==", "rollup")
+    .where("children", "array-contains", context_params.entityId)
     .get();
+
+  // ... & loop through all of them
   for (const rollup_entity_doc of rollup_ent_snaps.docs) {
     const rollup_entity = rollup_entity_doc.data() as entity_model.entityDoc;
     const rollup_plan_snaps = await rollup_entity_doc.ref
@@ -330,14 +338,14 @@ async function updateAccountInRollupEntities(
         .get();
 
       for (const rollup_version_doc of rollup_version_snaps.docs) {
+        console.log(
+          `found matching parent version for child version: ${context_params.versionId}`
+        );
         const acct_cmpnts = utils.extractComponentsFromFullAccountString(
           nlevel_acct_after.full_account,
           [entity_obj.full_account]
         );
 
-        // convert the dept string to replace the entity => IMPORTANT: update the utils to evaluate the embeds array for undefined and the field!!
-        // create a new full account string
-        // query the account from the rollup entity
         // add values to it (pass in changes from main function)
         // save account
         console.log(
@@ -345,6 +353,63 @@ async function updateAccountInRollupEntities(
             acct_cmpnts
           )}`
         );
+
+        if (nlevel_acct_after.dept === undefined)
+          throw new Error(
+            `Dept not defined for account ${nlevel_acct_after.full_account} in version ${context_params.versionId}`
+          );
+
+        // convert the dept string to replace the entity => IMPORTANT: update the utils to evaluate the embeds array for undefined and the field!!
+        const rollup_dept_id = utils.substituteEntityForRollup(
+          nlevel_acct_after.dept,
+          rollup_entity.entity_embeds,
+          rollup_entity.number
+        );
+        console.log(
+          `converted dept_id from ${nlevel_acct_after.dept} to ${rollup_dept_id}`
+        );
+
+        // create a new full account string
+        const rollup_full_account = utils.buildFullAccountString(
+          [rollup_entity.full_account],
+          { ...acct_cmpnts, dept: rollup_dept_id }
+        );
+
+        // query the account from the rollup entity
+        const rollup_acct_snap = await rollup_version_doc.ref
+          .collection("dept")
+          .doc(rollup_full_account)
+          .get();
+
+        if (!rollup_acct_snap.exists) {
+          console.log(
+            `Account ${rollup_full_account} not found in version ${rollup_version_doc.id} for entity ${rollup_entity_doc.id}`
+          );
+          continue;
+        }
+
+        const rollup_account = rollup_acct_snap.data() as plan_model.accountDoc;
+
+        // account found, do the math
+        console.log(
+          `Account found in version ${rollup_version_doc.id} for entity ${
+            rollup_entity_doc.id
+          }: ${JSON.stringify(rollup_account)}`
+        );
+
+        //rollup_account.total += acct_changes.diffTotal;
+        for (const idx of acct_changes.months_changed) {
+          rollup_account.values[idx] += acct_changes.diffByMonth[idx];
+        }
+
+        // updated account
+        console.log(
+          `updated rollup account, to be saved back: ${JSON.stringify(
+            rollup_account
+          )}`
+        );
+
+        await rollup_acct_snap.ref.update({ values: rollup_account.values });
       }
     }
   }

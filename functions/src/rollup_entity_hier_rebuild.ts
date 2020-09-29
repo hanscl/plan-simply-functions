@@ -205,23 +205,13 @@ function replaceEntityIds(
   rollup_div_dict: entity_model.divDict
 ) {
   if (rollup_entity.entity_embeds === undefined) return;
-    
-  console.log(`running replaceEntityIds`);
-  // find entity embed definition for dept
-  const fltrd_dept_embeds = rollup_entity.entity_embeds.filter((embed_map) => {
-    return embed_map.field === "dept";
-  });
-
-  if (fltrd_dept_embeds.length < 1) return;
-    
-  console.log(`found dept embed rule`);
 
   // parse through all dicts
   for (const acct_id of Object.keys(rollup_acct_dict)) {
     console.log(`acct entry before replace: ${JSON.stringify(rollup_acct_dict[acct_id])}`);
     substituteEntityInDeptList(
       rollup_acct_dict[acct_id].depts,
-      fltrd_dept_embeds[0],
+      rollup_entity.entity_embeds,
       rollup_entity.number
     );
     console.log(`acct entry after replace: ${JSON.stringify(rollup_acct_dict[acct_id])}`);
@@ -230,7 +220,7 @@ function replaceEntityIds(
   for (const dept_id of dept_keys) {
     const newKey = utils.substituteEntityForRollup(
       dept_id,
-      fltrd_dept_embeds[0].pos,
+      rollup_entity.entity_embeds,
       rollup_entity.number
     );
     rollup_dept_dict[newKey] = rollup_dept_dict[dept_id];
@@ -239,7 +229,7 @@ function replaceEntityIds(
   for (const div_id of Object.keys(rollup_div_dict)) {
     substituteEntityInDeptList(
       rollup_div_dict[div_id].depts,
-      fltrd_dept_embeds[0],
+      rollup_entity.entity_embeds,
       rollup_entity.number
     );
   }
@@ -247,13 +237,13 @@ function replaceEntityIds(
 
 function substituteEntityInDeptList(
   dept_list: string[],
-  dept_embed: entity_model.entityEmbed,
+  embeds: entity_model.entityEmbed[],
   entity_id: string
 ) {
   for (let idx = 0; idx < dept_list.length; idx++) {
     dept_list[idx] = utils.substituteEntityForRollup(
       dept_list[idx],
-      dept_embed.pos,
+      embeds,
       entity_id
     );
   }

@@ -220,38 +220,28 @@ export const updateRollupEntityVersion = functions.firestore
             .collection("dept")
             .where("class", "==", "acct")
             .get();
-          
+
           // Loop through all the n-level accounts of the current child version
           for (const child_acct_doc of child_accts_snap.docs) {
             const child_acct = child_acct_doc.data() as plan_model.accountDoc;
 
-            let dept_id = child_acct.dept;
-            // convert dept_id (if necessary)
-            if (rollup_entity.entity_embeds !== undefined) {
-              const fltrd_dept_embeds = rollup_entity.entity_embeds.filter(
-                (embed_map) => {
-                  return embed_map.field === "dept";
-                }
+            if (child_acct.dept === undefined)
+              throw new Error(
+                "QUery to child version accts of tupe acct returned acct(s) without dept >> Fatal error."
               );
 
-              if (child_acct.dept === undefined)
-                throw new Error(
-                  "QUery to child version accts of tupe acct returned acct(s) without dept >> Fatal error."
-                );
+            console.log(
+              `calling utils.substitute for dept_id ${child_acct.dept}`
+            );
+            // fix the dept string using utils.
+            const dept_id = utils.substituteEntityForRollup(
+              child_acct.dept,
+              rollup_entity.entity_embeds,
+              rollup_entity.number
+            );
+            console.log(`new dept id is ${dept_id}`);
 
-              if (
-                fltrd_dept_embeds.length > 0
-              ) {
-                console.log(`calling utils.substitute for dept_id ${dept_id}`);
-                // fix the dept string using utils.
-                dept_id = utils.substituteEntityForRollup(
-                  child_acct.dept,
-                  fltrd_dept_embeds[0].pos,
-                  rollup_entity.number
-                );
-                console.log(`new dept id is ${dept_id}`);
-              }
-            } // End dept conversion
+            // End dept conversion
 
             // build full account string for rollup
             const full_account = utils.buildFullAccountString(
@@ -305,7 +295,6 @@ export const updateRollupEntityVersion = functions.firestore
       return;
     }
   });
-
 
 function addAccountValues(
   baseAccount: plan_model.accountDoc,
