@@ -89,8 +89,7 @@ export const importAccountsFromCsv = functions.storage
           console.log(`Skipping entity ${entity_doc.id}`);
           continue;
         }
-        console.log(`Processing entity ${entity_doc.id}`);
-        console.log(`Evaluating Entity entity ${entity_doc.id}`);
+        console.log(`Evaluating entity ${entity_doc.id}`);
         // loop through the departments of this entity
         const dept_snap = await db
           .doc(`entities/${entity_doc.id}/entity_structure/dept`)
@@ -144,6 +143,10 @@ export const importAccountsFromCsv = functions.storage
             // console.log(
             //   `ENTITY:DEPT ${entity_doc.id}:${dept_id} -- Creating account ${acct_matrix_row["Description"]} with G/L ${acct_matrix_row["GL"]} and Classification ${acct_matrix_row["Classification"]}`
             // );
+          }
+
+          if(acct_dict[acct_row["GL"]].depts.length === 0) {
+            delete acct_dict[acct_row["GL"]];
           }
         }
         console.log(

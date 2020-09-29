@@ -14,3 +14,7 @@ export { importAccountsFromCsv } from "./cloudstorage_import_accts";
 
 // View Stuff
 export { planVersionHierarchyGenerate } from "./plan_version_hier_generate";
+
+// Rollup Entity 
+export { rebuildRollupEntityHierarchy } from "./rollup_entity_hier_rebuild";
+export { updateRollupEntityVersion } from "./rollup_entity_version_update";

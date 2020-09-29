@@ -79,14 +79,14 @@ export const planViewGenerate = functions.firestore
           .collection(`by_org_level`)
           .get();
         sect_snapshots.forEach(async (sect_doc) => {
-          await deleteCollection(sect_doc.ref.collection("sections"), 300);
+          await utils.deleteCollection(sect_doc.ref.collection("sections"), 300);
         });
-        await deleteCollection(view_doc.ref.collection("by_org_level"), 300);
+        await utils.deleteCollection(view_doc.ref.collection("by_org_level"), 300);
         await view_doc.ref.delete();
       });
 
       // delete the pnl collection with the view aggregations
-      await deleteCollection(
+      await utils.deleteCollection(
         db.collection(
           `entities/${context_params.entityId}/plans/${context_params.planId}/versions/${context_params.versionId}/pnl`
         ),
@@ -699,42 +699,4 @@ function getEmptyValuesArray() {
   return [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 }
 
-async function deleteCollection(
-  collectionRef: FirebaseFirestore.CollectionReference<
-    FirebaseFirestore.DocumentData
-  >,
-  batchSize: number
-) {
-  const query = collectionRef.orderBy("__name__").limit(batchSize);
 
-  return new Promise((resolve, reject) => {
-    deleteQueryBatch(query, resolve).catch(reject);
-  });
-}
-
-async function deleteQueryBatch(
-  query: FirebaseFirestore.Query<FirebaseFirestore.DocumentData>,
-  resolve: any
-) {
-  const snapshot = await query.get();
-
-  const batchSize = snapshot.size;
-  if (batchSize === 0) {
-    // When there are no documents left, we are done
-    resolve();
-    return;
-  }
-
-  // Delete documents in a batch
-  const batch = db.batch();
-  snapshot.docs.forEach((doc) => {
-    batch.delete(doc.ref);
-  });
-  await batch.commit();
-
-  // Recurse on the next process tick, to avoid
-  // exploding the stack.
-  process.nextTick(() => {
-    deleteQueryBatch(query, resolve).catch();
-  });
-}

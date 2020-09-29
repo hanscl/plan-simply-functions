@@ -55,7 +55,7 @@ export const importDivisionsFromCsv = functions.storage
       });
 
       // loop through all entities
-      const entities_snap = await db.collection(`entities`).get();
+      const entities_snap = await db.collection(`entities`).where("type", "==", "entity").get();
       if (entities_snap.empty) throw new Error("no entities found");
       for (const entity_doc of entities_snap.docs) {
         const entity_obj = entity_doc.data() as entity_model.entityDoc;
