@@ -110,15 +110,13 @@ export const updateRollupEntityVersion = functions.firestore
         const rollup_plan_ref = prnt_plan_snap.docs[0].ref;
 
         // check if version already exists to get the new version number
-        let rollup_version_number = 0;
+        let rollup_version_ref = undefined;
         const prnt_version_snap = await rollup_plan_ref
           .collection("versions")
-          .where("name", "==", child_entity_plan.name)
+          .where("name", "==", child_entity_version.name)
           .get();
         if (!prnt_version_snap.empty)
-          rollup_version_number =
-            (prnt_version_snap.docs[0].data() as plan_model.versionDoc).number +
-            1;
+          rollup_version_ref = prnt_version_snap.docs[0].ref;
 
         // also get id of default P&L Structure document
         const rollup_pnl_snap = await rollup_entity_ref
@@ -205,13 +203,14 @@ export const updateRollupEntityVersion = functions.firestore
           ready_for_view: false,
           child_version_ids: child_version_ids,
           name: child_entity_version.name,
-          number: rollup_version_number,
+          number: 0,
           pnl_structure_id: rollup_pnl_struct_id,
         };
 
         // DB: version doc to batch
-        const new_version_ref = rollup_plan_ref.collection("versions").doc();
-        acct_wx_batch.set(new_version_ref, version_doc);
+        if(rollup_version_ref === undefined)
+          rollup_version_ref = rollup_plan_ref.collection("versions").doc();
+        acct_wx_batch.set(rollup_version_ref, version_doc);
         acct_wx_ctr++;
 
         // Process all the plan version of each of the children of this rollup entity
@@ -273,7 +272,7 @@ export const updateRollupEntityVersion = functions.firestore
           // DB: all accounts to batch
           for (const acct_obj of rollup_version_accts) {
             acct_wx_batch.set(
-              new_version_ref.collection("dept").doc(acct_obj.full_account),
+              rollup_version_ref.collection("dept").doc(acct_obj.full_account),
               acct_obj
             );
             acct_wx_ctr++;
