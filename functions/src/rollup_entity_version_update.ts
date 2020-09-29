@@ -109,14 +109,21 @@ export const updateRollupEntityVersion = functions.firestore
         // TODO: Save plan reference for parent?
         const rollup_plan_ref = prnt_plan_snap.docs[0].ref;
 
-        // check if version already exists to get the new version number
+        // check if version already exists => it if does then delete its collections and save the reference
         let rollup_version_ref = undefined;
         const prnt_version_snap = await rollup_plan_ref
           .collection("versions")
           .where("name", "==", child_entity_version.name)
           .get();
-        if (!prnt_version_snap.empty)
+          
+        if (!prnt_version_snap.empty) {
           rollup_version_ref = prnt_version_snap.docs[0].ref;
+          for (const coll_id of ["dept", "div", "pnl"])
+            await utils.deleteCollection(
+              rollup_version_ref.collection(coll_id),
+              300
+            );
+        }
 
         // also get id of default P&L Structure document
         const rollup_pnl_snap = await rollup_entity_ref
@@ -208,7 +215,7 @@ export const updateRollupEntityVersion = functions.firestore
         };
 
         // DB: version doc to batch
-        if(rollup_version_ref === undefined)
+        if (rollup_version_ref === undefined)
           rollup_version_ref = rollup_plan_ref.collection("versions").doc();
         acct_wx_batch.set(rollup_version_ref, version_doc);
         acct_wx_ctr++;
