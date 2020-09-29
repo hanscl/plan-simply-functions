@@ -140,6 +140,7 @@ export const updateRollupEntityVersion = functions.firestore
             entity_no: child_entity.number,
           },
         ];
+        const child_version_ids: string[] = [version_snap.id];
         for (const chld_entity_id of rollup_entity.children) {
           // do not requery plan of the child that triggered this function
           if (chld_entity_id === context_params.entity_id) continue;
@@ -178,13 +179,14 @@ export const updateRollupEntityVersion = functions.firestore
             );
           const chld_entity = chld_entity_snap.data() as entity_model.entityDoc;
 
-          // add version to list of child versions
+          // add version to list of child versions (and ids again)
           child_versions.push({
             id: chld_version_snap.docs[0].id,
             data: chld_version_snap.docs[0].data() as plan_model.versionDoc,
             ref: chld_version_snap.docs[0].ref,
             entity_no: chld_entity.number,
           });
+          child_version_ids.push(chld_version_snap.docs[0].id);
         }
 
         console.log(
@@ -196,88 +198,103 @@ export const updateRollupEntityVersion = functions.firestore
           )}`
         );
 
-        // Loop through the chart of account for the parent and look for matching accounts in each child to combine (add up)
-        const prnt_acct_snap = await db
-          .doc(`entities/${rollup_entity_id}/entity_structure/acct`)
-          .get();
-        if (!prnt_acct_snap.exists)
-          throw new Error(
-            `Unable to find acct document for entity ${rollup_entity_id} >> Fatal error, function terminating.`
-          );
-        const prnt_acct_dict = prnt_acct_snap.data() as entity_model.acctDict;
-
-        // Loop through all accounts in the rollup entity chart;
-        for (const acct_id of Object.keys(prnt_acct_dict)) {
-          // then loop through all depts within each account
-          for (const dept_id of prnt_acct_dict[acct_id].depts) {
-            let parent_account: plan_model.accountDoc | undefined = undefined;
-            for (const chld_ver of child_versions) {
-              const chld_account = await getChildAccount(
-                acct_id,
-                dept_id,
-                chld_ver,
-                rollup_entity.entity_embeds
-              );
-              console.log(
-                `retrieved child account ${JSON.stringify(chld_account)}`
-              );
-              if (chld_account === undefined) continue;
-              // if parent_account == undefined then assign, otherwise add++ [TODO: what about dept name]
-              if (parent_account === undefined) {
-                console.log(
-                  `first child account for this acct + dept combo. Assign to parent account`
-                );
-                parent_account = chld_account;
-                // update parameters
-                parent_account.dept = dept_id;
-                parent_account.full_account = utils.buildFullAccountString(
-                  [rollup_entity.full_account],
-                  { dept: dept_id, acct: acct_id, div: parent_account.div }
-                );
-                console.log(
-                  `Updated parent account: ${JSON.stringify(parent_account)}`
-                );
-                rollup_version_accts.push(parent_account);
-              } else {
-                addAccountValues(parent_account, chld_account);
-              }
-            } // END Child Version Loop
-          } // END Dept Loop
-        } // END Acct Loop
-        // Save to database --
-        // DB (1) Put all  the version ids into one array
-        const version_ids: string[] = [];
-        child_versions.forEach((chld_vrs_obj) => {
-          version_ids.push(chld_vrs_obj.id);
-        });
-        // DB(2): Create the version doc
+        // DB: Create the version doc
         const version_doc: plan_model.versionDoc = {
           last_update: admin.firestore.Timestamp.now(),
           calculated: false,
           ready_for_view: false,
-          child_version_ids: version_ids,
+          child_version_ids: child_version_ids,
           name: child_entity_version.name,
           number: rollup_version_number,
           pnl_structure_id: rollup_pnl_struct_id,
         };
-        // DB(3): version doc to batch
+
+        // DB: version doc to batch
         const new_version_ref = rollup_plan_ref.collection("versions").doc();
         acct_wx_batch.set(new_version_ref, version_doc);
         acct_wx_ctr++;
-        // DB(4): all accounts to batch
-        for (const acct_obj of rollup_version_accts) {
-          acct_wx_batch.set(
-            new_version_ref.collection("dept").doc(acct_obj.full_account),
-            acct_obj
-          );
-          acct_wx_ctr++;
-          // intermittent write
-          if (acct_wx_ctr > 400) {
-            await acct_wx_batch.commit();
-            acct_wx_batch = db.batch();
-            acct_wx_ctr = 0;
+
+        // Process all the plan version of each of the children of this rollup entity
+        for (const child_version of child_versions) {
+          const child_accts_snap = await child_version.ref
+            .collection("dept")
+            .where("class", "==", "acct")
+            .get();
+          
+          // Loop through all the n-level accounts of the current child version
+          for (const child_acct_doc of child_accts_snap.docs) {
+            const child_acct = child_acct_doc.data() as plan_model.accountDoc;
+
+            let dept_id = child_acct.dept;
+            // convert dept_id (if necessary)
+            if (rollup_entity.entity_embeds !== undefined) {
+              const fltrd_dept_embeds = rollup_entity.entity_embeds.filter(
+                (embed_map) => {
+                  return embed_map.field === "dept";
+                }
+              );
+
+              if (child_acct.dept === undefined)
+                throw new Error(
+                  "QUery to child version accts of tupe acct returned acct(s) without dept >> Fatal error."
+                );
+
+              if (
+                fltrd_dept_embeds.length > 0
+              ) {
+                console.log(`calling utils.substitute for dept_id ${dept_id}`);
+                // fix the dept string using utils.
+                dept_id = utils.substituteEntityForRollup(
+                  child_acct.dept,
+                  fltrd_dept_embeds[0].pos,
+                  rollup_entity.number
+                );
+                console.log(`new dept id is ${dept_id}`);
+              }
+            } // End dept conversion
+
+            // build full account string for rollup
+            const full_account = utils.buildFullAccountString(
+              [rollup_entity.full_account],
+              { dept: dept_id, acct: child_acct.acct, div: child_acct.div }
+            );
+
+            console.log(`new full account is: ${full_account}`);
+
+            // find matching parent account
+            const fltrd_rollup_accts = rollup_version_accts.filter(
+              (rollup_acct) => {
+                return rollup_acct.full_account === full_account;
+              }
+            );
+
+            // if not parent account, push this child account into array, otherwise add to the parent account we found
+            if (fltrd_rollup_accts.length === 0) {
+              rollup_version_accts.push({
+                ...child_acct,
+                dept: dept_id,
+                full_account: full_account,
+              });
+            } else {
+              addAccountValues(fltrd_rollup_accts[0], child_acct);
+            }
           }
-        }
+
+          // DB: all accounts to batch
+          for (const acct_obj of rollup_version_accts) {
+            acct_wx_batch.set(
+              new_version_ref.collection("dept").doc(acct_obj.full_account),
+              acct_obj
+            );
+            acct_wx_ctr++;
+            // intermittent write
+            if (acct_wx_ctr > 400) {
+              await acct_wx_batch.commit();
+              acct_wx_batch = db.batch();
+              acct_wx_ctr = 0;
+            }
+          }
+        } // END Child Version Loop
       } // END Rollup Entity Loop
       // Final write
       if (acct_wx_ctr > 0) await acct_wx_batch.commit();
@@ -289,51 +306,51 @@ export const updateRollupEntityVersion = functions.firestore
     }
   });
 
-async function getChildAccount(
-  acct_id: string,
-  dept_id: string,
-  child_version: childVersion,
-  entity_embeds: entity_model.entityEmbed[] | undefined
-) {
-  console.log(
-    `entering get Child Account for ${acct_id} and ${dept_id} with child version ${child_version} and embeds map ${entity_embeds}`
-  );
-  let fltrd_dept_embeds = undefined;
-  if (entity_embeds !== undefined) {
-    // find entity embed definition for dept
-    fltrd_dept_embeds = entity_embeds.filter((embed_map) => {
-      return embed_map.field === "dept";
-    });
-  }
+// async function getChildAccount(
+//   acct_id: string,
+//   dept_id: string,
+//   child_version: childVersion,
+//   entity_embeds: entity_model.entityEmbed[] | undefined
+// ) {
+//   console.log(
+//     `entering get Child Account for ${acct_id} and ${dept_id} with child version ${child_version} and embeds map ${entity_embeds}`
+//   );
+//   let fltrd_dept_embeds = undefined;
+//   if (entity_embeds !== undefined) {
+//     // find entity embed definition for dept
+//     fltrd_dept_embeds = entity_embeds.filter((embed_map) => {
+//       return embed_map.field === "dept";
+//     });
+//   }
 
-  let subst_dept_id = dept_id;
-  if (fltrd_dept_embeds !== undefined && fltrd_dept_embeds.length > 0) {
-    console.log(`calling utils.substitute for dept_id ${dept_id}`);
-    // fix the dept string using utils.
-    subst_dept_id = utils.substituteEntityForRollup(
-      dept_id,
-      fltrd_dept_embeds[0].pos,
-      child_version.entity_no
-    );
-    console.log(`substituted dept_id is ${subst_dept_id}`);
-  }
-  // query the dept collection of the child version
-  const child_acct_snap = await child_version.ref
-    .collection("dept")
-    .where("acct", "==", acct_id)
-    .where("dept", "==", subst_dept_id)
-    .get();
-  if (child_acct_snap.empty) {
-    console.log(
-      `Could not find acct ${acct_id} with dept ${subst_dept_id} for version ${JSON.stringify(
-        child_version.data
-      )} >> non-fatal - return to caller`
-    );
-    return undefined;
-  }
-  //should only be ONE account => return first one
-  return child_acct_snap.docs[0].data() as plan_model.accountDoc;
-}
+//   let subst_dept_id = dept_id;
+//   if (fltrd_dept_embeds !== undefined && fltrd_dept_embeds.length > 0) {
+//     console.log(`calling utils.substitute for dept_id ${dept_id}`);
+//     // fix the dept string using utils.
+//     subst_dept_id = utils.substituteEntityForRollup(
+//       dept_id,
+//       fltrd_dept_embeds[0].pos,
+//       child_version.entity_no
+//     );
+//     console.log(`substituted dept_id is ${subst_dept_id}`);
+//   }
+//   // query the dept collection of the child version
+//   const child_acct_snap = await child_version.ref
+//     .collection("dept")
+//     .where("acct", "==", acct_id)
+//     .where("dept", "==", subst_dept_id)
+//     .get();
+//   if (child_acct_snap.empty) {
+//     console.log(
+//       `Could not find acct ${acct_id} with dept ${subst_dept_id} for version ${JSON.stringify(
+//         child_version.data
+//       )} >> non-fatal - return to caller`
+//     );
+//     return undefined;
+//   }
+//   //should only be ONE account => return first one
+//   return child_acct_snap.docs[0].data() as plan_model.accountDoc;
+// }
 
 function addAccountValues(
   baseAccount: plan_model.accountDoc,

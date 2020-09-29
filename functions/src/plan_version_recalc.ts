@@ -2,6 +2,8 @@ import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import * as plan_model from "./plan_model";
 import * as view_model from "./view_model";
+import * as utils from "./utils";
+import * as entity_model from "./entity_model";
 
 interface batchCounter {
   total_pending: number;
@@ -86,6 +88,9 @@ export const planVersionRecalc = functions.firestore
 
       // update the total in the after account object
       nlevel_acct_after.total += +diffTotal;
+
+      // call update to rollup entity, if any
+      updateAccountInRollupEntities(context_params, nlevel_acct_after, acct_changes);
 
       // create a new batch and add n-level account changes
       let acct_update_batch = db.batch();
@@ -291,5 +296,56 @@ async function updatePnlAggregates(
       values: pnl_obj.values,
     });
     batch_counter.total_pending++;
+  }
+}
+
+async function updateAccountInRollupEntities(
+  context_params: contextParams,
+  nlevel_acct_after: plan_model.accountDoc,
+  acct_changes: acctChanges
+) {
+  // get the entity doc of the one that was changed initially
+  const entity_snap = await db.doc(`entities/${context_params.entityId}`).get();
+  if (!entity_snap.exists)
+    throw new Error(
+      "could not find entity document of the entity where the account was updated >> Fatal error."
+    );
+  const entity_obj = entity_snap.data() as entity_model.entityDoc;
+
+  // If this version is also used in a rollup entity => update that account as well
+  const rollup_ent_snaps = await db
+    .collection(`entities`)
+    .where("type", "==", "rollup")
+    .get();
+  for (const rollup_entity_doc of rollup_ent_snaps.docs) {
+    const rollup_entity = rollup_entity_doc.data() as entity_model.entityDoc;
+    const rollup_plan_snaps = await rollup_entity_doc.ref
+      .collection("plans")
+      .get();
+
+    for (const rollup_plan_doc of rollup_plan_snaps.docs) {
+      const rollup_version_snaps = await rollup_plan_doc.ref
+        .collection("versions")
+        .where("child_version_ids", "array-contains", context_params.versionId)
+        .get();
+
+      for (const rollup_version_doc of rollup_version_snaps.docs) {
+        const acct_cmpnts = utils.extractComponentsFromFullAccountString(
+          nlevel_acct_after.full_account,
+          [entity_obj.full_account]
+        );
+
+        // convert the dept string to replace the entity => IMPORTANT: update the utils to evaluate the embeds array for undefined and the field!!
+        // create a new full account string
+        // query the account from the rollup entity
+        // add values to it (pass in changes from main function)
+        // save account
+        console.log(
+          `extracted account components from full account: ${JSON.stringify(
+            acct_cmpnts
+          )}`
+        );
+      }
+    }
   }
 }
