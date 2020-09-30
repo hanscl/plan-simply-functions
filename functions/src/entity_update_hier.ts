@@ -8,9 +8,15 @@ export const entityHierarchyUpdate = functions.firestore
   .document("entities/{entityId}/entity_structure/{driverDocId}")
   .onWrite(async (snapshot, context) => {
     try {
-      if (context.params.driverDocId === "hier") {
+      if (
+        context.params.driverDocId === "hier" ||
+        context.params.driverDocId === "acct" ||
+        context.params.driverDocId === "rollup"
+      ) {
         // avoid endless updates
-        console.log("Updated hierarchy document itself; exit update function.");
+        console.log(
+          "Updated hierarchy document itself or an document that is not relevant => exit update function."
+        );
         return;
       }
 
@@ -34,23 +40,25 @@ export const entityHierarchyUpdate = functions.firestore
       }
       const dept_dict = dept_snapshot.data() as entity_model.deptDict;
 
-      // get default group path
-      const coll_path = `entities/${context.params.entityId}/account_rollups`;
-      const rollup_snap = await db
-        .collection(coll_path)
-        .where("default", "==", true)
-        .get();
-      if (rollup_snap.empty) {
-        console.log(
-          `Could not find default account rollup document at: ${coll_path}`
-        );
-        return;
+      // get group doc
+      let group_list: entity_model.groupObj[] = [];
+      doc_path = `entities/${context.params.entityId}/entity_structure/group`;
+      const group_snap = await db.doc(doc_path).get();
+      if (!group_snap.exists) {
+        console.log(`No group document at: ${doc_path} :: not fatal`);
+      } else {
+        group_list = (group_snap.data() as entity_model.groupDoc).groups;
       }
-      const group_coll_ref = rollup_snap.docs[0].ref.collection("groups");
+      // const group_coll_ref = rollup_snap.docs[0].ref.collection("groups");
+
+      // begin update - set flag for entity rollup to false
+      await db
+        .doc(`entities/${context.params.entityId}/entity_structure/hier`)
+        .set({ ready_for_rollup: false }, { merge: true });
 
       const hier_obj: entity_model.hierDoc = { children: [] };
 
-      for(const div_id of div_list) {
+      for (const div_id of div_list) {
         const div_level: entity_model.hierLevel = {
           level: "div",
           id: div_id,
@@ -58,33 +66,38 @@ export const entityHierarchyUpdate = functions.firestore
           children: [],
         };
         // first: add dept groups if there are any
-        const group_snap = await group_coll_ref
-          .where("div", "==", div_id)
-          .get();
+        // const group_snap = await group_coll_ref
+        //   .where("div", "==", div_id)
+        //   .get();
         const depts_in_groups: string[] = [];
-        group_snap.forEach((group_doc) => {
-          const group_obj = group_doc.data() as entity_model.groupDoc;
-          const group_level: entity_model.hierLevel = {
-            id: group_obj.code,
-            name: group_obj.name,
-            level: "dept",
-            children: [],
-          };
-          group_obj.children.forEach((dept_id) => {
-            depts_in_groups.push(dept_id);
-            const dept_level: entity_model.hierLevel = {
-              id: dept_id,
-              name: dept_dict[dept_id].name,
+        if (group_list.length > 0) {
+          const group_list_for_div = group_list.filter(
+            (item) => item.div === div_id
+          );
+          group_list_for_div.forEach((group_obj) => {
+            //const group_obj = group_doc.data() as entity_model.groupObj;
+            const group_level: entity_model.hierLevel = {
+              id: group_obj.code,
+              name: group_obj.name,
               level: "dept",
+              children: [],
             };
-            group_level.children?.push(dept_level);
+            group_obj.children.forEach((dept_id) => {
+              depts_in_groups.push(dept_id);
+              const dept_level: entity_model.hierLevel = {
+                id: dept_id,
+                name: dept_dict[dept_id].name,
+                level: "dept",
+              };
+              group_level.children?.push(dept_level);
+            });
+            div_level.children?.push(group_level);
           });
-          div_level.children?.push(group_level);
-        });
+        }
 
         // process other depts
         div_dict[div_id].depts.forEach((dept_id) => {
-          if (depts_in_groups.indexOf(dept_id) > -1 ) return;
+          if (depts_in_groups.indexOf(dept_id) > -1) return;
           const dept_level: entity_model.hierLevel = {
             level: "dept",
             id: dept_id,
@@ -94,10 +107,13 @@ export const entityHierarchyUpdate = functions.firestore
         });
         hier_obj.children.push(div_level);
 
+        // set flag so that the hierarchy can be processed by any rollup entities
+        hier_obj.ready_for_rollup = true;
+
         // save to firestore
         doc_path = `entities/${context.params.entityId}/entity_structure/hier`;
         await db.doc(doc_path).set(hier_obj);
-    }
+      }
     } catch (error) {
       console.log(`Error occured during entity hierarchy update: ${error}`);
       return;

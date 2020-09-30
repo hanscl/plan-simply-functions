@@ -28,13 +28,17 @@ export function extractAcctFromFullAccount(
     throw new Error(
       "[UTILS - extractAcctFromFullAccount] No matching account string found"
     );
+  
+  console.log(`placeholder string: ${placeholder}`);
 
   // find param in placeholder
+  console.log(`searching for ${search_str} in ${placeholder}`);
   const acct_begin_idx = placeholder.indexOf(search_str);
   if (acct_begin_idx === -1) {
     return undefined;
   }
   const string_before_acct = placeholder.substring(0, acct_begin_idx);
+  console.log(`string_before_acct = ${string_before_acct}`);
 
   // count the dots
   let dot_ctr = -1;
@@ -49,10 +53,12 @@ export function extractAcctFromFullAccount(
   for (let idx = 0; idx < dot_ctr; idx++) {
     dot_begin_pos = full_acct.indexOf(".", dot_begin_pos + 1);
   }
+  console.log(`dot_begin_pos now: ${dot_begin_pos}`);
   if (dot_begin_pos === -1) return undefined;
 
   let dot_end_pos = full_acct.indexOf(".", dot_begin_pos + 1);
   dot_end_pos = dot_end_pos === -1 ? full_acct.length : dot_end_pos;
+  
 
   // finally extract the string
   const acct = full_acct.substring(dot_begin_pos + 1, dot_end_pos);

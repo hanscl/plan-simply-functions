@@ -1,5 +1,13 @@
 export interface pnlStructure {
+  default: boolean;
   sections: pnlSection[];
+  expanded_levels: pnlExpandedLevels;
+}
+
+interface pnlExpandedLevels {
+  entity: number;
+  div: number;
+  dept: number;
 }
 
 export interface pnlSection {
@@ -7,8 +15,9 @@ export interface pnlSection {
   header: boolean;
   total: boolean;
   lines: boolean;
-  skip_levels?: number;
+  skip_rollups: number;
   filters: pnlDivFilter[];
+  org_levels: ("entity" | "div" | "dept")[];
 }
 
 interface pnlDivFilter {

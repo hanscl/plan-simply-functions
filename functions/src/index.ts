@@ -8,4 +8,4 @@ export { planVersionRecalc } from "./plan_version_recalc";
 export { entityHierarchyUpdate } from "./entity_update_hier";
 
 // Driver-based
-export { driverDefinitionCreate } from "./driver_def_create"
+export { driverDefinitionUpdate } from "./driver_def_update"
