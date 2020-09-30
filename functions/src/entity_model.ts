@@ -1,11 +1,19 @@
 export interface entityDoc {
   children?: string[];
   name: string;
-  number?: string;
-  legal?: string;
+  number: string;
+  legal: string;
   full_account: string;
+  div_account?: string;
   full_account_export: string;
   acct_type_flip_sign?: string[];
+  type: string;
+  entity_embeds?: entityEmbed[]; 
+}
+
+export interface entityEmbed {
+  field: string;
+  pos: number;
 }
 
 export interface acctMap {
@@ -15,7 +23,7 @@ export interface acctMap {
 }
 
 export interface deptMap {
-  div: string;
+  div?: string;
   name: string;
 }
 
@@ -36,7 +44,7 @@ export type divDict = {
   [k: string]: divMap;
 };
 
-export interface groupDoc {
+export interface groupObj {
   children: string[];
   code: string;
   level: string;
@@ -44,20 +52,40 @@ export interface groupDoc {
   div: string;
 }
 
+export interface groupDoc {
+  groups: groupObj[];
+}
 
+export interface acctComponents {
+  dept?: string;
+  div: string;
+  acct: string;
+}
 
-export interface rollupDoc {
+export interface rollupObj {
   level: number;
   n_level: boolean;
   rollup: string;
-  child_rollups?: {[k: string]: number};
+  child_rollups?: { [k: string]: number };
   acct_types?: string[];
   accts_add?: string[];
   accts_remove?: string[];
 }
 
+export interface rollupSummaryDoc {
+  name: string;
+  max_level: number;
+  items: rollupNameMap[];
+}
+
+export interface rollupNameMap {
+  name: string;
+  code: string;
+}
+
 export interface hierDoc {
   children: hierLevel[];
+  ready_for_rollup?: boolean;
 }
 
 export interface hierLevel {

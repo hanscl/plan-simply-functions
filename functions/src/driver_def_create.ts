@@ -37,7 +37,7 @@ export const driverDefinitionCreate = functions.firestore
       }
 
       console.log(
-        `Account list resolved from "${new_driver_def.drivers}" to "${nlevel_ref_accts}"`
+        `Account list resolved from "${JSON.stringify(new_driver_def.drivers)}" to "${JSON.stringify(nlevel_ref_accts)}"`
       );
 
       new_driver_def.ref_accts = nlevel_ref_accts;

@@ -6,12 +6,21 @@ export interface contextParams {
   versionId: string;
 }
 
+export interface driverAcct {
+  level:("div" | "dept" | "pnl");
+  id: string;
+}
+
+export interface driverEntry {
+  type: ("acct" | "value");
+  entry: number[] | driverAcct;
+}
+
 export interface acctDriverDef {
-  driver_type: "period" | "total";
-  period_spread?: number[];
-  drivers: (string | number)[];
+  drivers: driverEntry[];
   operations: ("add" | "sub" | "mlt" | "dvs" | "pct")[];
-  ref_accts?: string[];
+  ref_accts?: string[]; 
+  comment?: string;
 }
 
 export interface driverDoc {
