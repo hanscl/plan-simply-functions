@@ -21,3 +21,6 @@ export { updateRollupEntityVersion } from "./rollup_entity_version_update";
 
 // Driver-based
 export { driverDefinitionUpdate } from "./driver_def_update"
+
+// User Management
+export { sendPasswordResetLink } from "./https_password_reset_email";
