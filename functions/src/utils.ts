@@ -172,8 +172,4 @@ async function deleteQueryBatch(
   process.nextTick(() => {
     deleteQueryBatch(query, resolve).catch();
   });
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> 114-driver-functionality
