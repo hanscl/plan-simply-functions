@@ -2,23 +2,25 @@ import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import * as nodemailer from "nodemailer";
 const cors = require("cors")({ origin: true });
+const key = require("../alert-condition-291223-fe5b366c5ed9.json");
 
 const system_url = "https://plan-simply-dmdev.web.app";
 
 export const sendPasswordResetLink = functions.https.onRequest(
   async (req, res) => {
-    cors(req, res, () => {
+    cors(req, res, async () => {
       // getting dest email by query string
       const user_email = req.query.user as string;
+      const support_send_email = "noreply@zerobaseapp.com";
 
       // get password reset link
       admin
         .auth()
         .generatePasswordResetLink(user_email, { url: system_url })
-        .then((reset_link) => {
+        .then(async (reset_link) => {
           const mailOptions = {
             //from: "ZeroBase Support <noreply@zerobaseapp.com>",
-            from:"hans.luther@gmail.com",
+            from: support_send_email,
             to: user_email,
             subject: "ZeroBase Password Reset", // email subject
             html: `Hello,<br><br>Follow this link to reset your ZeroBase password for ${user_email}:<br><br>
@@ -28,14 +30,27 @@ export const sendPasswordResetLink = functions.https.onRequest(
             Your ZeroBase Support team`, // email content in HTML
           };
 
+          // const transporter = nodemailer.createTransport({
+          //   service: "gmail",
+          //   auth: {
+          //     user: "hans.luther@gmail.com",
+          //     pass: "eeqjbuodxvcazsyb",
+          //   },
+          // });
+
           const transporter = nodemailer.createTransport({
-            service: "gmail",
+            host: "smtp.gmail.com",
+            port: 465,
+            secure: true,
             auth: {
-              user: "hans.luther@gmail.com",
-              pass: "eeqjbuodxvcazsyb",
+              type: "OAuth2",
+              user: support_send_email,
+              serviceClient: key.client_id,
+              privateKey: key.private_key,
             },
           });
 
+          await transporter.verify();
           transporter.sendMail(mailOptions, (error, info) => {
             if (error) {
               console.log(
