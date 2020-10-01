@@ -4,9 +4,9 @@ import * as nodemailer from "nodemailer";
 const cors = require("cors")({ origin: true });
 const key = require("../alert-condition-291223-fe5b366c5ed9.json");
 
-
 export const sendPasswordResetLink = functions.https.onRequest(
   async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
     cors(req, res, async () => {
       // getting dest email by query string
       const user_email = req.query.user as string;
@@ -15,7 +15,7 @@ export const sendPasswordResetLink = functions.https.onRequest(
       // try to build the project URL
       let system_url = "";
       let system_forward_text = "";
-      if(admin.app().options.projectId !== undefined) {
+      if (admin.app().options.projectId !== undefined) {
         system_url = `https://${admin.app().options.projectId}.web.app`;
         system_forward_text = `Once your password is reset, you may access the system here: ${system_url}<br><br>`;
       }
