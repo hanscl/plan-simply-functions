@@ -4,7 +4,6 @@ import * as nodemailer from "nodemailer";
 const cors = require("cors")({ origin: true });
 const key = require("../alert-condition-291223-fe5b366c5ed9.json");
 
-const system_url = "https://plan-simply-dmdev.web.app";
 
 export const sendPasswordResetLink = functions.https.onRequest(
   async (req, res) => {
@@ -12,6 +11,14 @@ export const sendPasswordResetLink = functions.https.onRequest(
       // getting dest email by query string
       const user_email = req.query.user as string;
       const support_send_email = "noreply@zerobaseapp.com";
+
+      // try to build the project URL
+      let system_url = "";
+      let system_forward_text = "";
+      if(admin.app().options.projectId !== undefined) {
+        system_url = `https://${admin.app().options.projectId}.web.app`;
+        system_forward_text = `Once your password is reset, you may access the system here: ${system_url}<br><br>`;
+      }
 
       // get password reset link
       admin
@@ -25,7 +32,7 @@ export const sendPasswordResetLink = functions.https.onRequest(
             subject: "ZeroBase Password Reset", // email subject
             html: `Hello,<br><br>Follow this link to reset your ZeroBase password for ${user_email}:<br><br>
             ${reset_link}<br><br>
-            Once your password is reset, you may access the system here: ${system_url}<br><br>
+            ${system_forward_text}
             If you didn’t ask to reset your password, you can ignore this email.<br><br>
             Your ZeroBase Support team`, // email content in HTML
           };
