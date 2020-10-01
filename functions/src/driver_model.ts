@@ -1,3 +1,5 @@
+import * as view_model from "./view_model";
+
 export interface contextParams {
   entityId: string;
   driverDocId: string;
@@ -28,3 +30,10 @@ export interface driverDoc {
     version_id: string;
 }
 
+export interface validDriverAccts {
+  entity: string;
+  account: string;
+  version_id: string;
+  plan_id: string;
+  lines?: view_model.viewChild[];
+}

@@ -68,6 +68,7 @@ export interface viewChild {
   acct: string;
   desc: string;
   child_accts?: viewChild[];
+  can_select?: boolean;
 }
 
 export type viewSectionDict = {
