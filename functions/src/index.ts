@@ -12,6 +12,9 @@ export { importDepartmentsFromCsv } from "./cloudstorage_import_depts";
 export { importDivisionsFromCsv } from "./cloudstorage_import_divs";
 export { importAccountsFromCsv } from "./cloudstorage_import_accts";
 
+// Reporting
+export { exportPlanVersionToCsv } from "./plan_version_csv_export";
+
 // View Stuff
 export { planVersionHierarchyGenerate } from "./plan_version_hier_generate";
 
