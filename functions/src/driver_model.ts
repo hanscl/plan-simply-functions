@@ -35,5 +35,5 @@ export interface validDriverAccts {
   account: string;
   version_id: string;
   plan_id: string;
-  lines?: view_model.viewChild[];
+  sections?: view_model.viewSection[];
 }

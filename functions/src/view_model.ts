@@ -61,6 +61,7 @@ export interface viewSection {
   totals_level?: string;
   totals_id?: string;
   lines?: viewChild[];
+  can_select?: boolean;
 }
 
 export interface viewChild {
