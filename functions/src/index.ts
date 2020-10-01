@@ -21,3 +21,4 @@ export { updateRollupEntityVersion } from "./rollup_entity_version_update";
 
 // Driver-based
 export { driverDefinitionUpdate } from "./driver_def_update"
+export { getValidDriverAccounts } from "./https_valid_driver_accounts";
