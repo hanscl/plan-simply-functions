@@ -29,6 +29,16 @@ export const exportPlanVersionToCsv = functions.firestore
 
       const report_definition = snapshot.data() as export_model.reportDoc;
 
+      // if the entity is a rollup, create reports for sub entities
+      
+
+      // update the report -definition
+      const plan_snap = await db.doc(`entities/${context_params.entity_id}/plans/${report_definition.plan_id}`).get();
+      if(plan_snap.exists) report_definition.plan_name = (plan_snap.data() as plan_model.planDoc).name;
+      const version_snap = await plan_snap.ref.collection(`versions`).doc(report_definition.version_id).get();
+      if(version_snap.exists) report_definition.version_name = (version_snap.data() as plan_model.versionDoc).name;
+      await snapshot.ref.update(report_definition);
+
       const file_name = `reports/${context_params.report_id}.csv`;
       const temp_file_path = path.join(os.tmpdir(), file_name);
 

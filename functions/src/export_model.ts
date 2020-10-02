@@ -4,7 +4,9 @@ export interface reportDoc {
     created_at: admin.firestore.Timestamp;
     output: "csv" | "xls" | "pdf";
     plan_id: string;
+    plan_name: string;
     version_id: string;
+    version_name: string;
     status: "processing" | "complete" | "error";
     type: "accounts" | "pnl";
 }
