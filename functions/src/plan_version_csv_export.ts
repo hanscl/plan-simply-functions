@@ -29,14 +29,39 @@ export const exportPlanVersionToCsv = functions.firestore
 
       const report_definition = snapshot.data() as export_model.reportDoc;
 
-      // if the entity is a rollup, create reports for sub entities
-      
+      // update the report-definition
+      const plan_snap = await db
+        .doc(
+          `entities/${context_params.entity_id}/plans/${report_definition.plan_id}`
+        )
+        .get();
+      if (plan_snap.exists)
+        report_definition.plan_name = (plan_snap.data() as plan_model.planDoc).name;
+      const version_snap = await plan_snap.ref
+        .collection(`versions`)
+        .doc(report_definition.version_id)
+        .get();
+      if (version_snap.exists)
+        report_definition.version_name = (version_snap.data() as plan_model.versionDoc).name;
 
-      // update the report -definition
-      const plan_snap = await db.doc(`entities/${context_params.entity_id}/plans/${report_definition.plan_id}`).get();
-      if(plan_snap.exists) report_definition.plan_name = (plan_snap.data() as plan_model.planDoc).name;
-      const version_snap = await plan_snap.ref.collection(`versions`).doc(report_definition.version_id).get();
-      if(version_snap.exists) report_definition.version_name = (version_snap.data() as plan_model.versionDoc).name;
+      // if the entity is a rollup, create reports for sub entities
+      const entity_snap = await db
+        .doc(`entities/${context_params.entity_id}`)
+        .get();
+      if (!entity_snap.exists)
+        throw new Error(
+          `Unexpected error: unable to find entity doc for ${context_params.entity_id}`
+        );
+
+      const entity = entity_snap.data() as entity_model.entityDoc;
+
+      if (entity.type === "rollup") {
+        await processRollupEntity(entity, report_definition);
+        await snapshot.ref.delete();
+        return;
+      }
+
+      // update the report -definition in the database
       await snapshot.ref.update(report_definition);
 
       const file_name = `reports/${context_params.report_id}.csv`;
@@ -66,6 +91,54 @@ export const exportPlanVersionToCsv = functions.firestore
       await snapshot.ref.update({ status: "error" });
     }
   });
+
+async function processRollupEntity(
+  rollup_entity: entity_model.entityDoc,
+  rollup_report: export_model.reportDoc
+) {
+  if (rollup_entity.children === undefined)
+    throw new Error(
+      `Rollup entity #${rollup_entity.number} does not have any children`
+    );
+
+  for (const child_id of rollup_entity.children) {
+    // find the correct plan version
+    const plan_snap = await db
+      .collection(`entities/${child_id}/plans`)
+      .where("name", "==", rollup_report.plan_name)
+      .get();
+    if (plan_snap.empty) {
+      console.log(
+        `Plan ${rollup_report.plan_name} not found for child entity ${child_id}. Skipping report for entity`
+      );
+      return;
+    }
+    const version_snap = await plan_snap.docs[0].ref
+      .collection("versions")
+      .where("name", "==", rollup_report.version_name)
+      .get();
+    if (version_snap.empty) {
+      console.log(
+        `Version ${rollup_report.version_name} not found for child entity ${child_id}. Skipping report for entity`
+      );
+      return;
+    }
+    // create report for child entity
+    const child_report: export_model.reportDoc = {
+      created_at: admin.firestore.Timestamp.now(),
+      output: rollup_report.output,
+      plan_id: plan_snap.docs[0].id,
+      plan_name: rollup_report.plan_name,
+      version_id: version_snap.docs[0].id,
+      version_name: rollup_report.version_name,
+      status: "processing",
+      type: rollup_report.type,
+    };
+
+    // save to firestore
+    await db.collection(`entities/${child_id}/reports`).add(child_report);
+  }
+}
 
 async function buildReportJson(
   context_params: contextParams,
