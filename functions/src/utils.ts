@@ -93,6 +93,15 @@ export function buildFullAccountString(
   return ret_str;
 }
 
+export function buildFixedAccountString(format_str:string, components:{div?: string, dept?: string, acct?: string} ) {
+  let full_account = format_str;
+  if(components.div !== undefined) full_account = full_account.replace("@div@", components.div);
+  if(components.dept !== undefined) full_account = full_account.replace("@dept@", components.dept);
+  if(components.acct !== undefined) full_account = full_account.replace("@acct@", components.acct);
+
+  return full_account;
+}
+
 export function extractComponentsFromFullAccountString(
   full_account: string,
   format_coll: string[]
