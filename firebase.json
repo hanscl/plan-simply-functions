@@ -8,10 +8,16 @@
   },
   "hosting": {
     "public": "public",
-    "ignore": [
-      "firebase.json",
-      "**/.*",
-      "**/node_modules/**"
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "rewrites": [
+      {
+        "source": "/password-reset-link",
+        "function": "sendPasswordResetLink"
+      },
+      {
+        "source": "/valid-driver-accounts",
+        "function": "getValidDriverAccounts"
+      }
     ]
   },
   "emulators": {
