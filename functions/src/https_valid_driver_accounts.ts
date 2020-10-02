@@ -17,6 +17,41 @@ export const getValidDriverAccounts = functions.https.onRequest(
   async (request, response) => {
     cors(request, response, async () => {
       try {
+        response.set("Access-Control-Allow-Origin", "*");
+        response.set("Access-Control-Allow-Credentials", "true");
+
+        if (request.method === "OPTIONS") {
+          response.set("Access-Control-Allow-Methods", "GET");
+          response.set("Access-Control-Allow-Headers", "Authorization");
+          response.set("Access-Control-Max-Age", "3600");
+          response.status(204).send("");
+
+          return;
+        }
+
+        //     let requestedUid = request.body.     // resource the user is requsting to modify
+        const authToken = validateHeader(request); // current user encrypted
+
+        if (!authToken) {
+          response.status(403).send("Unauthorized! Missing auth token!");
+          return;
+        }
+
+        const dec_token = await decodeAuthToken(authToken);
+
+        if(dec_token === undefined) {
+          response.status(403).send("Invalid token.");
+          return;
+        }
+    
+        console.log(`uid: ${dec_token}`);
+
+        const user_snap = await db.doc(`users/${dec_token}`).get();
+        if(!user_snap.exists) {
+          response.status(403).send("User not known in this system!");
+          return;
+        }
+
         const context_params = request.body as contextParams;
         console.log(
           `Running function for entity ${context_params.entity} and version ${context_params.version_id} with account ${context_params.account}`
@@ -33,7 +68,11 @@ export const getValidDriverAccounts = functions.https.onRequest(
         for (const driver_def_doc of driven_acct_snaps.docs)
           dep_accounts.push(driver_def_doc.id);
 
-        console.log(`found dependent accounts which cannot be used as a driver for this account: ${JSON.stringify(dep_accounts)}`);
+        console.log(
+          `found dependent accounts which cannot be used as a driver for this account: ${JSON.stringify(
+            dep_accounts
+          )}`
+        );
 
         // STEP 2: query the company view for this version and build the new JSON object
         const valid_driver_accounts: driver_model.validDriverAccts = {
@@ -88,7 +127,7 @@ export const getValidDriverAccounts = functions.https.onRequest(
 
         response.json(valid_driver_accounts).status(200).send();
 
-      //  response.send(`Function completed successfully.`);
+        //  response.send(`Function completed successfully.`);
       } catch (error) {
         console.log(`Error occured building driver account object: ${error}`);
         response.sendStatus(500);
@@ -112,7 +151,7 @@ function processDriverSections(
         if (can_select === false) section.can_select = false;
         else
           section.can_select =
-          section.can_select === true || section.can_select === undefined
+            section.can_select === true || section.can_select === undefined
               ? true
               : false;
       }
@@ -141,4 +180,29 @@ function evaluateAccount(
   }
 
   return acct_obj.can_select;
+}
+
+function validateHeader(req: functions.https.Request) {
+  if (
+    req.headers.authorization &&
+    req.headers.authorization.startsWith("Bearer ")
+  ) {
+    console.log("auth header found");
+    return req.headers.authorization.split("Bearer ")[1];
+  }
+
+  return "";
+}
+
+function decodeAuthToken(authToken: string) {
+  return admin
+    .auth()
+    .verifyIdToken(authToken)
+    .then((decodedToken) => {
+      // decode the current user's auth token
+      return decodedToken.uid;
+    })
+    .catch(reason => {
+      return undefined;
+    });
 }
