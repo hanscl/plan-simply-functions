@@ -162,7 +162,7 @@ export const planViewGenerate = functions.firestore
         );
       const div_definitions = div_snap.data() as entity_model.divDict;
       const div_list: string[] = Object.keys(div_definitions);
-
+      
       // get list of groups for the entity
       let groups_list: entity_model.groupObj[] = [];
       const group_snap = await db
@@ -405,8 +405,6 @@ async function createDivViewSection(
     header: section_obj.header,
     position: section_pos,
   };
-
-  console.log(`creating div view section`);
 
   // if we have more than one account for this division => create a custom PNL aggregate
   // otherwise, just reference this div account

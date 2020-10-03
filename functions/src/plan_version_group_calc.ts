@@ -77,6 +77,11 @@ export const planVersionGroupCreate = functions.firestore
 
       if (!group_snapshot.exists) {
         console.log("No group definitions found");
+            // all done. Set the view_ready flag to true so the view will be generated
+      await db
+      .doc(`entities/${entityId}/plans/${planId}/versions/${versionId}`)
+      .update({ ready_for_view: true });
+
         return;
       }
 

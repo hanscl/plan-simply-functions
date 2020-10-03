@@ -75,6 +75,10 @@ export const importAccountsFromCsv = functions.storage
       for (const entity_doc of entities_snap.docs) {
         const entity_obj = entity_doc.data() as entity_model.entityDoc;
         // only process relevant entity(ies)
+        if(entity_obj.type === "rollup") {
+          console.log(`skipping entity ${entity_doc.id} -- this is a rollup`);
+          continue;
+        }
         if (
           run_for_entity === RunMode.Include &&
           !entity_ids.includes(entity_doc.id)
