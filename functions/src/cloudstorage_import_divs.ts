@@ -47,7 +47,7 @@ export const importDivisionsFromCsv = functions.storage
         stream.on("error", reject);
       });
 
-      console.log(`DIV ROWS: `)
+   //   console.log(`DIV ROWS: `)
 
       // split the array for each
       div_rows.forEach((row) => {
@@ -95,11 +95,11 @@ export const importDivisionsFromCsv = functions.storage
           }
         });
 
-        console.log(
-          `For entity ${entity_doc.id} :: DIV = ${JSON.stringify(
-            div_dict
-          )} :: DEPT = ${JSON.stringify(dept_dict)}`
-        );
+        // console.log(
+        //   `For entity ${entity_doc.id} :: DIV = ${JSON.stringify(
+        //     div_dict
+        //   )} :: DEPT = ${JSON.stringify(dept_dict)}`
+        // );
 
         // set the documents
         await entity_doc.ref

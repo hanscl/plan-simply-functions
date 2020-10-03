@@ -42,7 +42,7 @@ export const importDepartmentsFromCsv = functions.storage
 
       if(entity_no === undefined) throw new Error("No entity number. cannot proceed");
 
-      console.log(`Processing dept upload for entity ${parts[1]}`);
+     // console.log(`Processing dept upload for entity ${parts[1]}`);
 
       const csv = require("csv-parser");
       const stripBom = require("strip-bom-stream");
@@ -70,7 +70,7 @@ export const importDepartmentsFromCsv = functions.storage
         }
       });
 
-      console.log(`Adding document: ${JSON.stringify(dept_doc)}`);
+    //  console.log(`Adding document: ${JSON.stringify(dept_doc)}`);
 
       await db
         .doc(`entities/${entity_id}/entity_structure/dept`)

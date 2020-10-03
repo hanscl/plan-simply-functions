@@ -111,12 +111,12 @@ export const planVersionGroupCreate = functions.firestore
           const grp_children: string[] = [];
           for (const child_doc of acct_snapshot.docs) {
             const child_acct = child_doc.data() as plan_model.accountDoc;
-            console.log(
-              "adding child " +
-                child_acct.full_account +
-                " to parent " +
-                group_obj.code
-            );
+            // console.log(
+            //   "adding child " +
+            //     child_acct.full_account +
+            //     " to parent " +
+            //     group_obj.code
+            // );
 
             child_acct.values.forEach((child_val, index) => {
               values[index] += child_val;
@@ -171,9 +171,9 @@ export const planVersionGroupCreate = functions.firestore
             group_acct.dept = acct_dept;
           }
 
-          console.log("ADDING GROUP: " + JSON.stringify(group_acct));
+          // console.log("ADDING GROUP: " + JSON.stringify(group_acct));
           const docpath = `entities/${entityId}/plans/${planId}/versions/${versionId}/${group_obj.level}/${full_account}`;
-          console.log(docpath);
+          // console.log(docpath);
           group_wx_batch.set(db.doc(docpath), group_acct);
           group_ctr++;
           // intermittent write

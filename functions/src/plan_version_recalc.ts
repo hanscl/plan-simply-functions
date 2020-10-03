@@ -308,7 +308,7 @@ async function updateAccountInRollupEntities(
   nlevel_acct_after: plan_model.accountDoc,
   acct_changes: acctChanges
 ) {
-  console.log(`Updating account in rollup entity if needed`);
+  // console.log(`Updating account in rollup entity if needed`);
   // get the entity doc of the one that was changed initially
   const entity_snap = await db.doc(`entities/${context_params.entityId}`).get();
   if (!entity_snap.exists)
@@ -338,9 +338,9 @@ async function updateAccountInRollupEntities(
         .get();
 
       for (const rollup_version_doc of rollup_version_snaps.docs) {
-        console.log(
-          `found matching parent version for child version: ${context_params.versionId}`
-        );
+        // console.log(
+        //   `found matching parent version for child version: ${context_params.versionId}`
+        // );
         const acct_cmpnts = utils.extractComponentsFromFullAccountString(
           nlevel_acct_after.full_account,
           [entity_obj.full_account]
@@ -348,11 +348,11 @@ async function updateAccountInRollupEntities(
 
         // add values to it (pass in changes from main function)
         // save account
-        console.log(
-          `extracted account components from full account: ${JSON.stringify(
-            acct_cmpnts
-          )}`
-        );
+        // console.log(
+        //   `extracted account components from full account: ${JSON.stringify(
+        //     acct_cmpnts
+        //   )}`
+        // );
 
         if (nlevel_acct_after.dept === undefined)
           throw new Error(
@@ -365,9 +365,9 @@ async function updateAccountInRollupEntities(
           rollup_entity.entity_embeds,
           rollup_entity.number
         );
-        console.log(
-          `converted dept_id from ${nlevel_acct_after.dept} to ${rollup_dept_id}`
-        );
+        // console.log(
+        //   `converted dept_id from ${nlevel_acct_after.dept} to ${rollup_dept_id}`
+        // );
 
         // create a new full account string
         const rollup_full_account = utils.buildFullAccountString(
@@ -391,11 +391,11 @@ async function updateAccountInRollupEntities(
         const rollup_account = rollup_acct_snap.data() as plan_model.accountDoc;
 
         // account found, do the math
-        console.log(
-          `Account found in version ${rollup_version_doc.id} for entity ${
-            rollup_entity_doc.id
-          }: ${JSON.stringify(rollup_account)}`
-        );
+        // console.log(
+        //   `Account found in version ${rollup_version_doc.id} for entity ${
+        //     rollup_entity_doc.id
+        //   }: ${JSON.stringify(rollup_account)}`
+        // );
 
         //rollup_account.total += acct_changes.diffTotal;
         for (const idx of acct_changes.months_changed) {
@@ -403,11 +403,11 @@ async function updateAccountInRollupEntities(
         }
 
         // updated account
-        console.log(
-          `updated rollup account, to be saved back: ${JSON.stringify(
-            rollup_account
-          )}`
-        );
+        // console.log(
+        //   `updated rollup account, to be saved back: ${JSON.stringify(
+        //     rollup_account
+        //   )}`
+        // );
 
         await rollup_acct_snap.ref.update({ values: rollup_account.values });
       }

@@ -74,9 +74,9 @@ export const exportPlanVersionToCsv = functions.firestore
         .bucket(`csvexport-${admin.app().options.projectId}`);
 
       const data = await buildReportJson(context_params, report_definition);
-      console.log(`json data: ${JSON.stringify(data)}`);
+      // console.log(`json data: ${JSON.stringify(data)}`);
       const csv_data = json2csv.parse(data);
-      console.log(`csv data: ${JSON.stringify(csv_data)}`);
+      // console.log(`csv data: ${JSON.stringify(csv_data)}`);
       await fs.outputFile(temp_file_path, csv_data);
 
       await bucket.upload(temp_file_path, { destination: file_name });
@@ -246,7 +246,7 @@ async function buildReportJson(
       report_obj.push(csv_line);
     }
   }
-  console.log(`report obj before return: ${JSON.stringify(report_obj)}`);
+  // console.log(`report obj before return: ${JSON.stringify(report_obj)}`);
 
   return report_obj;
 }

@@ -70,7 +70,7 @@ export const rebuildRollupEntityHierarchy = functions.firestore
           const child_div_snap = await db
             .doc(`entities/${child_id}/entity_structure/div`)
             .get();
-            console.log(`finished getting child entity docs for ${child_id}`);
+            // console.log(`finished getting child entity docs for ${child_id}`);
           if (
             !child_acct_snap.exists ||
             !child_dept_snap.exists ||
@@ -86,18 +86,18 @@ export const rebuildRollupEntityHierarchy = functions.firestore
             rollup_dept_dict === undefined ||
             rollup_div_dict === undefined
           ) {
-            console.log(`assigning dicts for the first time`);
+            // console.log(`assigning dicts for the first time`);
             rollup_acct_dict = child_acct_snap.data() as entity_model.acctDict;
             rollup_dept_dict = child_dept_snap.data() as entity_model.deptDict;
             rollup_div_dict = child_div_snap.data() as entity_model.divDict;
-            console.log(
-              `dicts before replace: DIV -- ${JSON.stringify(
-                rollup_div_dict
-              )} DEPT -- ${JSON.stringify(
-                rollup_dept_dict
-              )} ACCT -- ${JSON.stringify(rollup_acct_dict)}`
-            );
-            console.log(`Rollup Entity: ${JSON.stringify(rollup_entity)}`);
+            // console.log(
+            //   `dicts before replace: DIV -- ${JSON.stringify(
+            //     rollup_div_dict
+            //   )} DEPT -- ${JSON.stringify(
+            //     rollup_dept_dict
+            //   )} ACCT -- ${JSON.stringify(rollup_acct_dict)}`
+            // );
+            // console.log(`Rollup Entity: ${JSON.stringify(rollup_entity)}`);
             // replace entity_ids
             replaceEntityIds(
               rollup_entity,
@@ -105,17 +105,17 @@ export const rebuildRollupEntityHierarchy = functions.firestore
               rollup_dept_dict,
               rollup_div_dict
             );
-            console.log(
-                `dicts after replace: DIV -- ${JSON.stringify(
-                  rollup_div_dict
-                )} DEPT -- ${JSON.stringify(
-                  rollup_dept_dict
-                )} ACCT -- ${JSON.stringify(rollup_acct_dict)}`
-              );
+            // console.log(
+            //     `dicts after replace: DIV -- ${JSON.stringify(
+            //       rollup_div_dict
+            //     )} DEPT -- ${JSON.stringify(
+            //       rollup_dept_dict
+            //     )} ACCT -- ${JSON.stringify(rollup_acct_dict)}`
+            //   );
           }
           // This is not the first child, we need to proceed with merging the entity structures!
           else {
-            console.log(`2nd+ child for rollup`);
+            // console.log(`2nd+ child for rollup`);
             const child_acct_dict = child_acct_snap.data() as entity_model.acctDict;
             const child_dept_dict = child_dept_snap.data() as entity_model.deptDict;
             const child_div_dict = child_div_snap.data() as entity_model.divDict;
@@ -133,13 +133,13 @@ export const rebuildRollupEntityHierarchy = functions.firestore
           }
         }
         // save to database in one batch
-        console.log(
-          `saving dicts to ${rollup_entity_doc.id}: ${JSON.stringify(
-            rollup_acct_dict
-          )} - ${JSON.stringify(rollup_dept_dict)} - ${JSON.stringify(
-            rollup_div_dict
-          )}`
-        );
+        // console.log(
+        //   `saving dicts to ${rollup_entity_doc.id}: ${JSON.stringify(
+        //     rollup_acct_dict
+        //   )} - ${JSON.stringify(rollup_dept_dict)} - ${JSON.stringify(
+        //     rollup_div_dict
+        //   )}`
+        // );
         const wx_batch = db.batch();
         wx_batch.set(
           db.doc(`entities/${rollup_entity_doc.id}/entity_structure/acct`),
@@ -208,13 +208,13 @@ function replaceEntityIds(
 
   // parse through all dicts
   for (const acct_id of Object.keys(rollup_acct_dict)) {
-    console.log(`acct entry before replace: ${JSON.stringify(rollup_acct_dict[acct_id])}`);
+    // console.log(`acct entry before replace: ${JSON.stringify(rollup_acct_dict[acct_id])}`);
     substituteEntityInDeptList(
       rollup_acct_dict[acct_id].depts,
       rollup_entity.entity_embeds,
       rollup_entity.number
     );
-    console.log(`acct entry after replace: ${JSON.stringify(rollup_acct_dict[acct_id])}`);
+    // console.log(`acct entry after replace: ${JSON.stringify(rollup_acct_dict[acct_id])}`);
   }
   const dept_keys = Object.keys(rollup_dept_dict);
   for (const dept_id of dept_keys) {

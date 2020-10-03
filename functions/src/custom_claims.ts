@@ -96,15 +96,15 @@ export const writeUserAccount = functions.firestore
         console.log(
           "entities array updated; defer updating custom claims. Function will be retriggered."
         );
-        console.log(JSON.stringify(user_after.entities_read));
-        console.log(JSON.stringify(user_after.entities_write));
+        // console.log(JSON.stringify(user_after.entities_read));
+        // console.log(JSON.stringify(user_after.entities_write));
 
         await db.doc(`users/${userId}`).update({
           entities_read: user_after.entities_read,
           entities_write: user_after.entities_write,
         });
       } else {
-        console.log("Creating custom claims.");
+       // console.log("Creating custom claims.");
         const user_cc_obj: custClaims = {
           assigned_roles: user_after.roles,
           entities_read: user_after.entities_read,

@@ -63,7 +63,7 @@ export const importAccountsFromCsv = functions.storage
       });
 
       // print
-      console.log(`Account Matrix loaded: ${JSON.stringify(all_acct_rows)}`);
+      // console.log(`Account Matrix loaded: ${JSON.stringify(all_acct_rows)}`);
 
       // process entities
       const entities_snap = await db
@@ -76,24 +76,24 @@ export const importAccountsFromCsv = functions.storage
         const entity_obj = entity_doc.data() as entity_model.entityDoc;
         // only process relevant entity(ies)
         if(entity_obj.type === "rollup") {
-          console.log(`skipping entity ${entity_doc.id} -- this is a rollup`);
+          //console.log(`skipping entity ${entity_doc.id} -- this is a rollup`);
           continue;
         }
         if (
           run_for_entity === RunMode.Include &&
           !entity_ids.includes(entity_doc.id)
         ) {
-          console.log(`Skipping entity ${entity_doc.id}`);
+          //console.log(`Skipping entity ${entity_doc.id}`);
           continue;
         }
         if (
           run_for_entity === RunMode.Exclude &&
           entity_ids.includes(entity_doc.id)
         ) {
-          console.log(`Skipping entity ${entity_doc.id}`);
+          //console.log(`Skipping entity ${entity_doc.id}`);
           continue;
         }
-        console.log(`Evaluating entity ${entity_doc.id}`);
+        // console.log(`Evaluating entity ${entity_doc.id}`);
         // loop through the departments of this entity
         const dept_snap = await db
           .doc(`entities/${entity_doc.id}/entity_structure/dept`)
@@ -153,11 +153,11 @@ export const importAccountsFromCsv = functions.storage
             delete acct_dict[acct_row["GL"]];
           }
         }
-        console.log(
-          `Acct dict for entity ${entity_doc.id} READY: ${JSON.stringify(
-            acct_dict
-          )}`
-        );
+        // console.log(
+        //   `Acct dict for entity ${entity_doc.id} READY: ${JSON.stringify(
+        //     acct_dict
+        //   )}`
+        // );
         await db.doc(`entities/${entity_doc.id}/entity_structure/acct`).set(acct_dict);
       }
     } catch (error) {

@@ -197,11 +197,11 @@ export const updateRollupEntityVersion = functions.firestore
         console.log(
           `All children of entity ${rollup_entity_id} have a version named ${child_entity_version.name} in plan ${child_entity_plan.name} >> Proceed with updating rollup version`
         );
-        console.log(
-          `Here are the version data we are using: ${JSON.stringify(
-            child_versions
-          )}`
-        );
+        // console.log(
+        //   `Here are the version data we are using: ${JSON.stringify(
+        //     child_versions
+        //   )}`
+        // );
 
         // DB: Create the version doc
         const version_doc: plan_model.versionDoc = {
@@ -233,19 +233,19 @@ export const updateRollupEntityVersion = functions.firestore
 
             if (child_acct.dept === undefined)
               throw new Error(
-                "QUery to child version accts of tupe acct returned acct(s) without dept >> Fatal error."
+                "Query to child version accts of tupe acct returned acct(s) without dept >> Fatal error."
               );
 
-            console.log(
-              `calling utils.substitute for dept_id ${child_acct.dept}`
-            );
+            // console.log(
+            //   `calling utils.substitute for dept_id ${child_acct.dept}`
+            // );
             // fix the dept string using utils.
             const dept_id = utils.substituteEntityForRollup(
               child_acct.dept,
               rollup_entity.entity_embeds,
               rollup_entity.number
             );
-            console.log(`new dept id is ${dept_id}`);
+            // console.log(`new dept id is ${dept_id}`);
 
             // End dept conversion
 
@@ -255,7 +255,7 @@ export const updateRollupEntityVersion = functions.firestore
               { dept: dept_id, acct: child_acct.acct, div: child_acct.div }
             );
 
-            console.log(`new full account is: ${full_account}`);
+            // console.log(`new full account is: ${full_account}`);
 
             // find matching parent account
             const fltrd_rollup_accts = rollup_version_accts.filter(
@@ -307,22 +307,22 @@ function addAccountValues(
   newAccount: plan_model.accountDoc
 ) {
   // add total
-  console.log(
-    `adding accounts. BASE ACCOUNT: Total before: ${
-      baseAccount.total
-    } -- Values before: ${JSON.stringify(baseAccount.values)}`
-  );
-  console.log(
-    `adding accounts. NEW ACCOUNT: Total before: ${
-      newAccount.total
-    } -- Values before: ${JSON.stringify(newAccount.values)}`
-  );
+  // console.log(
+  //   `adding accounts. BASE ACCOUNT: Total before: ${
+  //     baseAccount.total
+  //   } -- Values before: ${JSON.stringify(baseAccount.values)}`
+  // );
+  // console.log(
+  //   `adding accounts. NEW ACCOUNT: Total before: ${
+  //     newAccount.total
+  //   } -- Values before: ${JSON.stringify(newAccount.values)}`
+  // );
   baseAccount.total += newAccount.total;
   for (let idx = 0; idx < baseAccount.values.length; idx++)
     baseAccount.values[idx] += newAccount.values[idx];
-  console.log(
-    `added accounts. Total after: ${
-      baseAccount.total
-    } -- Values after: ${JSON.stringify(baseAccount.values)}`
-  );
+  // console.log(
+  //   `added accounts. Total after: ${
+  //     baseAccount.total
+  //   } -- Values after: ${JSON.stringify(baseAccount.values)}`
+  // );
 }

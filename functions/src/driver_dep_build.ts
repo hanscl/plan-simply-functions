@@ -65,25 +65,25 @@ export async function begin_dependency_build(
     // 2. ALL ENTITY STRUCTURE DOCS HAVE BEEN LOADED - PROCEED
 
     // remove values from drivers to be left with accounts/rollups to resolve for dependency checks
-    console.log(
-      `Entity structs loaded. Proceed to filyer driver list for 'acct' types only. driver_lst: ${JSON.stringify(
-        driver_lst
-      )}`
-    );
+    // console.log(
+    //   `Entity structs loaded. Proceed to filyer driver list for 'acct' types only. driver_lst: ${JSON.stringify(
+    //     driver_lst
+    //   )}`
+    // );
     const driver_accts: driver_model.driverEntry[] = driver_lst.filter(
       (driver_entry) => {
         return driver_entry.type === "acct";
       }
     );
 
-    console.log(`filtered driver entries: ${JSON.stringify(driver_accts)}`);
+    // console.log(`filtered driver entries: ${JSON.stringify(driver_accts)}`);
 
     const acct_list: string[] = [];
     driver_accts.forEach((drv_acct) => {
       acct_list.push((drv_acct.entry as driver_model.driverAcct).id);
     });
 
-    console.log(`acct string array: ${JSON.stringify(acct_list)}`);
+    // console.log(`acct string array: ${JSON.stringify(acct_list)}`);
 
     return resolveRollups(
       acct_list,
@@ -105,7 +105,7 @@ function acctIsRollup(
   rollups: entity_model.rollupObj[]
 ): boolean {
   // if the level of the account is NOT dept, then it's definitely a driver
-  console.log(`checking ${JSON.stringify(driver_account)} for rollup identity`);
+  // console.log(`checking ${JSON.stringify(driver_account)} for rollup identity`);
   // if(driver_account.level !== "dept") return true;
 
   // if the level IS dept, we need to evaluate the account code
@@ -114,15 +114,15 @@ function acctIsRollup(
     [entity.full_account, entity.full_account_export],
     "acct"
   );
-  console.log(`retrieved code ${acct} from extraction function`);
+  // console.log(`retrieved code ${acct} from extraction function`);
 
   const rollup_idx = rollups.findIndex((rollup_obj) => {
     //console.log(`looking for ${acct} in ${JSON.stringify(rollup_obj)}`);
     return rollup_obj.rollup === acct;
   });
-  console.log(`rollup findIndex returned: ${rollup_idx}`);
+  // console.log(`rollup findIndex returned: ${rollup_idx}`);
   if (rollup_idx !== -1) {
-    console.log(`acct ${driver_account} is rollup`);
+    // console.log(`acct ${driver_account} is rollup`);
     return true;
   }
 
@@ -156,20 +156,20 @@ function getRollupChildren(
     .replace("@div@", acct_components.div);
 
   const ret_acct_list: string[] = [];
-  console.log(
-    `begin case evaluation for finding rollupc hildren for ${driver_account}`
-  );
+  // console.log(
+  //   `begin case evaluation for finding rollupc hildren for ${driver_account}`
+  // );
 
-  console.log(`acct_components: ${JSON.stringify(acct_components)}`);
-  console.log(`full_acct_no_dept: ${full_acct_no_dept}`);
+  // console.log(`acct_components: ${JSON.stringify(acct_components)}`);
+  // console.log(`full_acct_no_dept: ${full_acct_no_dept}`);
 
   // 1. DIV => go to DEPTS
   if (acct_components.dept === undefined) {
-    console.log("its a div");
+    // console.log("its a div");
     for (const add_dept_id of div_dict[acct_components.div].depts) {
       ret_acct_list.push(full_acct_no_dept.replace("@dept@", add_dept_id));
     }
-    console.log(`replaced parent with ${ret_acct_list}`);
+    // console.log(`replaced parent with ${ret_acct_list}`);
     return ret_acct_list;
   }
 
@@ -178,46 +178,46 @@ function getRollupChildren(
     return group_obj.code === acct_components.dept;
   });
   if (group_items.length > 0) {
-    console.log("its a group");
+    // console.log("its a group");
     for (const grp_child of group_items[0].children) {
       ret_acct_list.push(full_acct_no_dept.replace("@dept@", grp_child));
     }
-    console.log(`replaced parent with ${ret_acct_list}`);
+    // console.log(`replaced parent with ${ret_acct_list}`);
     return ret_acct_list;
   }
 
-  console.log("roll down acctrollup");
+  // console.log("roll down acctrollup");
   // 3. It's not a GROUP or DIV, so now we roll down the ACCT LEVEL
   const full_acct_no_acct = entity.full_account
     .replace("@dept@", acct_components.dept)
     .replace("@div@", acct_components.div);
-  console.log(`full_acct_no_acct: ${full_acct_no_acct}`);
+  // console.log(`full_acct_no_acct: ${full_acct_no_acct}`);
   const rollup_items = rollups.filter((rollup_obj) => {
     return rollup_obj.rollup === acct_components.acct;
   });
   if (rollup_items.length > 0) {
-    console.log(`found rollup definition: ${JSON.stringify(rollup_items)}`);
+    // console.log(`found rollup definition: ${JSON.stringify(rollup_items)}`);
 
     // More rollups?
     if (rollup_items[0].child_rollups !== undefined) {
       for (const rollup_id of Object.keys(rollup_items[0].child_rollups)) {
-        console.log("adding rollup child");
+        // console.log("adding rollup child");
         ret_acct_list.push(full_acct_no_acct.replace("@acct@", rollup_id));
       }
       // found rollups, we can return now
-      console.log(`replaced parent with ${JSON.stringify(ret_acct_list)}`);
+      // console.log(`replaced parent with ${JSON.stringify(ret_acct_list)}`);
       return ret_acct_list;
     }
 
     // If we get here, the rollup does not have further rollup children, we need to find
     // n-level accounts to return
-    console.log("adding nlevel accts");
+    // console.log("adding nlevel accts");
     const acct_list = Object.entries(acct_dict).filter(
       ([item_acct_id, acct_map]) => acct_map.type === acct_components.acct
     );
-    console.log(
-      `acct_list where type is the rollup account: ${JSON.stringify(acct_list)}`
-    );
+    // console.log(
+    //   `acct_list where type is the rollup account: ${JSON.stringify(acct_list)}`
+    // );
     for (const acct_item of acct_list) {
       if (!acct_dict[acct_item[0]].depts.includes(acct_components.dept))
         continue;
@@ -225,7 +225,7 @@ function getRollupChildren(
       const upd_acct = full_acct_no_acct.replace("@acct@", acct_item[0]);
       ret_acct_list.push(upd_acct);
     }
-    console.log(`replaced parent with ${ret_acct_list}`);
+    // console.log(`replaced parent with ${ret_acct_list}`);
     return ret_acct_list;
   }
 
@@ -243,13 +243,13 @@ function resolveRollups(
   acct_dict: entity_model.acctDict,
   groups: entity_model.groupObj[]
 ): string[] {
-  console.log(`running resolveRollups for ${acct_lst}`);
+  // console.log(`running resolveRollups for ${acct_lst}`);
   let acct_lst_copy = acct_lst;
   for (let idx = acct_lst_copy.length - 1; idx >= 0; idx--) {
     if (acctIsRollup(acct_lst_copy[idx], entity, rollups)) {
-      console.log(
-        `detected rollup -- slice and concatenate, call recursively for rollup`
-      );
+      // console.log(
+      //   `detected rollup -- slice and concatenate, call recursively for rollup`
+      // );
       acct_lst_copy = acct_lst_copy
         .slice(0, idx)
         .concat(
