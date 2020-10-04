@@ -36,72 +36,84 @@ export const planVersionRecalc = functions.firestore
   )
   .onUpdate(async (snapshot, context) => {
     try {
-      const nlevel_acct_before = snapshot.before.data() as plan_model.accountDoc;
-      const nlevel_acct_after = snapshot.after.data() as plan_model.accountDoc;
       const context_params = {
         entityId: context.params.entityId,
         planId: context.params.planId,
         versionId: context.params.versionId,
       };
 
-      // EXIT IF THIS IS AN INITIAL PLAN CALCULATION or rollup account level!
-      if (
-        (nlevel_acct_after.parent_rollup !== undefined &&
-          nlevel_acct_before.parent_rollup === undefined) ||
-        nlevel_acct_after.class === "rollup"
-      ) {
-        return;
-      }
+      const nlevel_acct_before = snapshot.before.data() as plan_model.accountDoc;
 
-      // initialize variables for tracking changes in monthly data
-      const diffByMonth: number[] = [];
-      const months_changed: number[] = [];
-      let diffTotal = 0;
+      let nlevel_acct_after: plan_model.accountDoc | undefined = undefined;
+      let acct_changes: acctChanges | undefined = undefined;
 
-      // calculate difference for each month and track which months changed
-      // currently changes are triggered for each single change, but this is designed to handle multiple changes in the future
-      for (
-        let periodIdx = 0;
-        periodIdx < nlevel_acct_before.values.length;
-        periodIdx++
-      ) {
-        diffByMonth[periodIdx] =
-          nlevel_acct_after.values[periodIdx] -
-          nlevel_acct_before.values[periodIdx];
-        if (diffByMonth[periodIdx] !== 0) {
-          months_changed.push(periodIdx);
-          diffTotal += diffByMonth[periodIdx];
+      await db.runTransaction(async (transaction) => {
+        const acct_after = await transaction.get(snapshot.after.ref);
+        nlevel_acct_after = acct_after.data() as plan_model.accountDoc;
+
+        // EXIT IF THIS IS AN INITIAL PLAN CALCULATION or rollup account level!
+        if (
+          (nlevel_acct_after.parent_rollup !== undefined &&
+            nlevel_acct_before.parent_rollup === undefined) ||
+          nlevel_acct_after.class === "rollup"
+        ) {
+          return;
         }
-      }
 
-      const acct_changes: acctChanges = {
-        diffByMonth: diffByMonth,
-        diffTotal: diffTotal,
-        months_changed: months_changed,
-        operation: 1,
-      };
+        // initialize variables for tracking changes in monthly data
+        const diffByMonth: number[] = [];
+        const months_changed: number[] = [];
+        let diffTotal = 0;
 
-      // if there is no change across all 12 months, exit => this is important to avoid endless update triggers!!
-      if (months_changed.length === 0) {
-        return;
-      }
+        // calculate difference for each month and track which months changed
+        // currently changes are triggered for each single change, but this is designed to handle multiple changes in the future
+        for (
+          let periodIdx = 0;
+          periodIdx < nlevel_acct_before.values.length;
+          periodIdx++
+        ) {
+          diffByMonth[periodIdx] =
+            nlevel_acct_after.values[periodIdx] -
+            nlevel_acct_before.values[periodIdx];
+          if (diffByMonth[periodIdx] !== 0) {
+            months_changed.push(periodIdx);
+            diffTotal += diffByMonth[periodIdx];
+          }
+        }
 
-      // update the total in the after account object
-      nlevel_acct_after.total += diffTotal;
+        acct_changes = {
+          diffByMonth: diffByMonth,
+          diffTotal: diffTotal,
+          months_changed: months_changed,
+          operation: 1,
+        };
 
-      // call update to rollup entity, if any
-      await updateAccountInRollupEntities(
-        context_params,
-        nlevel_acct_after,
-        acct_changes
-      );
+        // if there is no change across all 12 months, exit => this is important to avoid endless update triggers!!
+        if (months_changed.length === 0) {
+          return;
+        }
+
+        // update the total in the after account object
+        // nlevel_acct_after.total += diffTotal;
+        nlevel_acct_after.total = nlevel_acct_after.values.reduce((a,b) => {
+            return a + b;
+          }, 0);
+
+        // call update to rollup entity, if any
+        await updateAccountInRollupEntities(
+          context_params,
+          nlevel_acct_after,
+          acct_changes
+        );
+
+        transaction.update(snapshot.after.ref, {
+          total: nlevel_acct_after.total,
+        });
+      });
 
       // create a new batch and add n-level account changes
       let acct_update_batch = db.batch();
-      acct_update_batch.update(snapshot.after.ref, {
-        total: nlevel_acct_after.total,
-      });
-      const batch_counter = { total_pending: 1 };
+      const batch_counter = { total_pending: 0 };
 
       // save account reference
       let currChildAcct: plan_model.accountDoc | undefined = nlevel_acct_after;
@@ -109,7 +121,8 @@ export const planVersionRecalc = functions.firestore
       // IF THERE IS NO PARENT ROLLUP, WE HAVE REACHED THE TOP LEVEL => END FUNCTION
       while (
         currChildAcct !== undefined &&
-        currChildAcct.parent_rollup !== undefined
+        currChildAcct.parent_rollup !== undefined &&
+        acct_changes !== undefined
       ) {
         currChildAcct = await updateParentAccounts(
           currChildAcct,
@@ -338,21 +351,10 @@ async function updateAccountInRollupEntities(
         .get();
 
       for (const rollup_version_doc of rollup_version_snaps.docs) {
-        // console.log(
-        //   `found matching parent version for child version: ${context_params.versionId}`
-        // );
         const acct_cmpnts = utils.extractComponentsFromFullAccountString(
           nlevel_acct_after.full_account,
           [entity_obj.full_account]
         );
-
-        // add values to it (pass in changes from main function)
-        // save account
-        // console.log(
-        //   `extracted account components from full account: ${JSON.stringify(
-        //     acct_cmpnts
-        //   )}`
-        // );
 
         if (nlevel_acct_after.dept === undefined)
           throw new Error(
@@ -365,9 +367,6 @@ async function updateAccountInRollupEntities(
           rollup_entity.entity_embeds,
           rollup_entity.number
         );
-        // console.log(
-        //   `converted dept_id from ${nlevel_acct_after.dept} to ${rollup_dept_id}`
-        // );
 
         // create a new full account string
         const rollup_full_account = utils.buildFullAccountString(
@@ -390,24 +389,10 @@ async function updateAccountInRollupEntities(
 
         const rollup_account = rollup_acct_snap.data() as plan_model.accountDoc;
 
-        // account found, do the math
-        // console.log(
-        //   `Account found in version ${rollup_version_doc.id} for entity ${
-        //     rollup_entity_doc.id
-        //   }: ${JSON.stringify(rollup_account)}`
-        // );
-
         //rollup_account.total += acct_changes.diffTotal;
         for (const idx of acct_changes.months_changed) {
           rollup_account.values[idx] += acct_changes.diffByMonth[idx];
         }
-
-        // updated account
-        // console.log(
-        //   `updated rollup account, to be saved back: ${JSON.stringify(
-        //     rollup_account
-        //   )}`
-        // );
 
         await rollup_acct_snap.ref.update({ values: rollup_account.values });
       }
