@@ -30,19 +30,30 @@ interface contextParams {
 
 const db = admin.firestore();
 
-export const planVersionRecalc = functions.firestore
+export const planVersionRecalc = functions.runWith({maxInstances: 1}).firestore
   .document(
     "entities/{entityId}/plans/{planId}/versions/{versionId}/dept/{acctId}"
   )
   .onUpdate(async (snapshot, context) => {
     try {
       const nlevel_acct_before = snapshot.before.data() as plan_model.accountDoc;
-      const nlevel_acct_after = snapshot.after.data() as plan_model.accountDoc;
+      let nlevel_acct_after = snapshot.after.data() as plan_model.accountDoc;
       const context_params = {
         entityId: context.params.entityId,
         planId: context.params.planId,
         versionId: context.params.versionId,
       };
+
+      // read the document again and print values from all updates
+      const nlevel_snap = await snapshot.after.ref.get();
+      if(!nlevel_snap.exists) throw new Error("Could not read updated document snapshot");
+
+      // console.log(`BEFORE Snapshot: ${JSON.stringify(nlevel_acct_before)}`);
+      // console.log(`AFTER Snapshot: ${JSON.stringify(nlevel_acct_after)}`);
+      // console.log(`NOW Snapshot: ${JSON.stringify(nlevel_snap.data() as plan_model.accountDoc)}`);
+
+      // run with CURRENT SNAPSHOT ...
+      nlevel_acct_after = nlevel_snap.data() as plan_model.accountDoc;
 
       // EXIT IF THIS IS AN INITIAL PLAN CALCULATION or rollup account level!
       if (
