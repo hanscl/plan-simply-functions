@@ -28,7 +28,7 @@ export function extractAcctFromFullAccount(
     throw new Error(
       "[UTILS - extractAcctFromFullAccount] No matching account string found"
     );
-  
+
   //console.log(`placeholder string: ${placeholder}`);
 
   // find param in placeholder
@@ -58,7 +58,6 @@ export function extractAcctFromFullAccount(
 
   let dot_end_pos = full_acct.indexOf(".", dot_begin_pos + 1);
   dot_end_pos = dot_end_pos === -1 ? full_acct.length : dot_end_pos;
-  
 
   // finally extract the string
   const acct = full_acct.substring(dot_begin_pos + 1, dot_end_pos);
@@ -93,11 +92,17 @@ export function buildFullAccountString(
   return ret_str;
 }
 
-export function buildFixedAccountString(format_str:string, components:{div?: string, dept?: string, acct?: string} ) {
+export function buildFixedAccountString(
+  format_str: string,
+  components: { div?: string; dept?: string; acct?: string }
+) {
   let full_account = format_str;
-  if(components.div !== undefined) full_account = full_account.replace("@div@", components.div);
-  if(components.dept !== undefined) full_account = full_account.replace("@dept@", components.dept);
-  if(components.acct !== undefined) full_account = full_account.replace("@acct@", components.acct);
+  if (components.div !== undefined)
+    full_account = full_account.replace("@div@", components.div);
+  if (components.dept !== undefined)
+    full_account = full_account.replace("@dept@", components.dept);
+  if (components.acct !== undefined)
+    full_account = full_account.replace("@acct@", components.acct);
 
   return full_account;
 }
@@ -122,14 +127,13 @@ export function substituteEntityForRollup(
   embed_maps: entity_model.entityEmbed[] | undefined,
   entityId: string
 ): string {
-  if(embed_maps === undefined) return origText;
+  if (embed_maps === undefined) return origText;
 
   const fltrd_dept_embeds = embed_maps.filter((embed_map) => {
     return embed_map.field === "dept";
   });
 
   if (fltrd_dept_embeds.length < 1) return origText;
-
 
   if (fltrd_dept_embeds[0].pos === ReplacePosition.end) {
     return `${origText.substring(
@@ -181,4 +185,40 @@ async function deleteQueryBatch(
   process.nextTick(() => {
     deleteQueryBatch(query, resolve).catch();
   });
+}
+
+export function getDaysInMonth(begin_year: number, begin_month: number): number[] {
+  // initialize arrays
+  const daysInMonth = [];
+
+  let curr_month = begin_month;
+  let curr_year = begin_year;
+
+  for (let ctr = 0; ctr < 12; ctr++) {
+    if (curr_month === 13) {
+      curr_month = 1;
+      curr_year++;
+    }
+    // calculate the days in the month and push into array
+    if ([1, 3, 5, 7, 8, 10, 12].includes(curr_month)) daysInMonth.push(31);
+    else if ([4, 6, 9, 11].includes(curr_month)) daysInMonth.push(30);
+    else {
+      if (leapyear(curr_year)) daysInMonth.push(29);
+      else daysInMonth.push(28);
+    }
+    curr_month++;
+  }
+  return daysInMonth;
+}
+
+function leapyear(year: number) {
+  return year % 100 === 0 ? year % 400 === 0 : year % 4 === 0;
+}
+
+export function getValuesArray(): number[] {
+  return [0,0,0,0,0,0,0,0,0,0,0,0]
+}
+
+export function finRound(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
 }

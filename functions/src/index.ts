@@ -28,3 +28,7 @@ export { getValidDriverAccounts } from "./https_valid_driver_accounts";
 
 // User Management
 export { sendPasswordResetLink } from "./https_password_reset_email";
+
+// Labor
+export { laborEntryUpdate } from "./labor_entry_update";
+export { laborRemoveAccount } from "./labor_remove_account";

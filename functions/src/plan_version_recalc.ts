@@ -87,7 +87,7 @@ export const planVersionRecalc = functions.firestore
       }
 
       // update the total in the after account object
-      nlevel_acct_after.total += +diffTotal;
+      nlevel_acct_after.total += diffTotal;
 
       // call update to rollup entity, if any
       await updateAccountInRollupEntities(
