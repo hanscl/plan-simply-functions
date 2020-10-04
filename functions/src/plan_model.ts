@@ -48,6 +48,7 @@ export interface accountDoc {
   group_children?: string[];
   is_group_child: boolean;
   is_labor_calc?: boolean;
+  is_driver_calc?: boolean;
 }
 
 interface parentRollup {
