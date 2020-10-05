@@ -1,11 +1,13 @@
 import * as view_model from "./view_model";
 
-export interface contextParams {
-  entityId: string;
-  driverDocId: string;
-  acctId: string;
-  planId: string;
-  versionId: string;
+export interface driverParamsContext {
+  entity_id: string;
+  version_id: string;
+  acct_id: string;
+}
+
+export interface driverParamsAll extends driverParamsContext {
+  plan_id: string;
 }
 
 export interface driverAcct {

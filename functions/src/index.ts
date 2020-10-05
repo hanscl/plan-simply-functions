@@ -23,7 +23,7 @@ export { rebuildRollupEntityHierarchy } from "./rollup_entity_hier_rebuild";
 export { updateRollupEntityVersion } from "./rollup_entity_version_update";
 
 // Driver-based
-export { driverDefinitionUpdate } from "./driver_def_update"
+export { driverDocUpdate, driverDocCreate } from "./driver_doc_change";
 export { getValidDriverAccounts } from "./https_valid_driver_accounts";
 
 // User Management
