@@ -47,7 +47,7 @@ export interface accountDoc {
   values: number[];
   group_children?: string[];
   is_group_child: boolean;
-  calc_type: "entry" | "driver" | "labor" | "ref";
+  calc_type?: "entry" | "driver" | "labor" | "ref";
 }
 
 interface parentRollup {
