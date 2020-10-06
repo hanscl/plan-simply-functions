@@ -44,11 +44,11 @@ export const planVersionRecalc = functions.runWith({maxInstances: 1}).firestore
         versionId: context.params.versionId,
       };
 
-      // Do not handle driver updates
-      if(nlevel_acct_after.is_driver_calc !==  undefined && nlevel_acct_after.is_driver_calc === true) {
-        console.log("Detected updated driver account, which I am not allowed to handle. Signing off :(");
-        return;
-      }
+      // Do not handle driver updates - J/K do handle driver updates as well
+      // if(nlevel_acct_after.is_driver_calc !==  undefined && nlevel_acct_after.is_driver_calc === true) {
+      //   console.log("Detected updated driver account, which I am not allowed to handle. Signing off :(");
+      //   return;
+      // }
 
       // read the document again and print values from all updates
       const nlevel_snap = await snapshot.after.ref.get();
@@ -147,6 +147,9 @@ export const planVersionRecalc = functions.runWith({maxInstances: 1}).firestore
       if (batch_counter.total_pending > 0) {
         await acct_update_batch.commit();
       }
+
+      // TODO: make sure any accounts dependent on this driver will be recalculated as well.
+      
     } catch (error) {
       console.log("Error occured during calculation of plan version: " + error);
       return;

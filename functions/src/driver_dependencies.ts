@@ -63,7 +63,7 @@ export async function driverDependencyBuild(
 
 /***** HELPER FUNCTION TO CHECK IF ACCOUNT IS A ROLLUP */
 function acctIsRollup(driver_account: string, entity: entity_model.entityDoc, rollups: entity_model.rollupObj[]): boolean {
-  const acct = utils.extractAcctFromFullAccount(driver_account, [entity.full_account], "acct");
+  const acct = utils.extractAcctFromFullAccount(driver_account, [entity.full_account, entity.div_account], "acct");
 
   const rollup_idx = rollups.findIndex((rollup_obj) => {
     return rollup_obj.rollup === acct;

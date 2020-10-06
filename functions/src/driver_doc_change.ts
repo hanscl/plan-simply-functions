@@ -2,6 +2,7 @@ import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import * as driver_model from "./driver_model";
 import * as driver_dependencies from "./driver_dependencies";
+import * as driver_calc from "./driver_calc";
 
 const db = admin.firestore();
 
@@ -16,7 +17,11 @@ export const driverDocUpdate = functions.firestore
       )
         return;
 
-      processDriverDocChange(snapshot.after, { entity_id: context.params.entityId, version_id: context.params.versionId, acct_id: context.params.acctId });
+      await processDriverDocChange(snapshot.after, {
+        entity_id: context.params.entityId,
+        version_id: context.params.versionId,
+        acct_id: context.params.acctId,
+      });
     } catch (error) {
       console.log("Error occured while processing driver doc: " + error);
       return;
@@ -24,10 +29,10 @@ export const driverDocUpdate = functions.firestore
   });
 
 export const driverDocCreate = functions.firestore
-  .document("entities/{entityId}/drivers/{driverDocId}/dept/{acctId}")
+  .document("entities/{entityId}/drivers/{versionId}/dept/{acctId}")
   .onCreate(async (snapshot, context) => {
     try {
-      processDriverDocChange(snapshot, { entity_id: context.params.entityId, version_id: context.params.versionId, acct_id: context.params.acctId });
+      await processDriverDocChange(snapshot, { entity_id: context.params.entityId, version_id: context.params.versionId, acct_id: context.params.acctId });
     } catch (error) {
       console.log("Error occured while updating driver doc: " + error);
       return;
@@ -38,7 +43,7 @@ async function processDriverDocChange(snapshot: admin.firestore.QueryDocumentSna
   // get the plan & version IDs from the driver document
   const driver_doc_ref = db.doc(`entities/${context_params.entity_id}/drivers/${context_params.version_id}`);
   const driver_doc = await driver_doc_ref.get();
-  if (!driver_doc.exists) throw new Error(`Driver document not found: ${JSON.stringify(driver_doc_ref)}`);
+  if (!driver_doc.exists) throw new Error(`Driver document not found: ${JSON.stringify(driver_doc_ref.path)}`);
 
   // complete the necessary context parameters
   const driver_params: driver_model.driverParamsAll = { ...context_params, plan_id: (driver_doc.data() as driver_model.driverDoc).plan_id };
@@ -46,7 +51,10 @@ async function processDriverDocChange(snapshot: admin.firestore.QueryDocumentSna
   // Get the acct driver definition from the document
   const acct_driver_definition = snapshot.data() as driver_model.acctDriverDef;
 
-  /******** 1. UPDATE DRIVER DEPENDENCIES ***************/
+  /******** 1. RECALC THE DRIVER VALUE ***************/
+  await driver_calc.driverCalcValue(acct_driver_definition, driver_params);
+
+  /******** 2. UPDATE DRIVER DEPENDENCIES ***************/
   const nlevel_ref_accts = await driver_dependencies.driverDependencyBuild(db, driver_params, acct_driver_definition.drivers);
   if (nlevel_ref_accts === undefined) throw new Error("Account dependency build returned undefined");
   console.log(`Account list resolved from "${JSON.stringify(acct_driver_definition.drivers)}" to "${JSON.stringify(nlevel_ref_accts)}"`);
@@ -54,8 +62,5 @@ async function processDriverDocChange(snapshot: admin.firestore.QueryDocumentSna
   // update the data object and also write to firestore
   acct_driver_definition.ref_accts = nlevel_ref_accts;
   await snapshot.ref.update({ ref_accts: nlevel_ref_accts });
-
-  /******** 2. RECALC THE DRIVER VALUE ***************/
-
 
 }
