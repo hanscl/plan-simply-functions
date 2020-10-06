@@ -19,6 +19,12 @@ export interface versionDoc {
   pnl_structure_id: string;
   ready_for_view?: boolean;
   child_version_ids: string[];
+  is_locked: versionLockStatus;
+}
+
+export interface versionLockStatus {
+  all: boolean;
+  periods: boolean[];
 }
 
 interface viewTotal {
@@ -33,6 +39,8 @@ interface viewPeriod {
 }
 
 export interface accountDoc {
+  full_account: string;
+  // basic account values
   acct: string;
   acct_name: string;
   acct_type?: string;
@@ -40,14 +48,16 @@ export interface accountDoc {
   dept?: string;
   div: string;
   divdept_name: string;
+  // group & rollups
   group: boolean;
-  full_account: string;
   parent_rollup?: parentRollup;
-  total: number;
-  values: number[];
   group_children?: string[];
   is_group_child: boolean;
-  calc_type?: "entry" | "driver" | "labor" | "ref";
+  // values & calculation
+  total: number;
+  values: number[];
+  calc_type?: "entry" | "driver" | "labor";
+  is_locked?: boolean;
 }
 
 interface parentRollup {
