@@ -21,7 +21,7 @@ export async function driverCalcValue(driver_def: driver_model.acctDriverDef, dr
       const acct_doc_ref = db.doc(
         `entities/${driver_params.entity_id}/plans/${driver_params.plan_id}/versions/${driver_params.version_id}/dept/${driver_params.acct_id}`
       );
-      driver_tx.update(acct_doc_ref, { values: last_result, is_driver_calc: true });
+      driver_tx.update(acct_doc_ref, { values: last_result, calc_type: "driver" });
     });
   } catch (e) {
     console.log("Transaction failure:", e);

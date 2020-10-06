@@ -15,8 +15,8 @@ export const laborRemoveAccount = functions.firestore
 
       if (
         !(
-          acct_before.is_labor_calc === true &&
-          acct_after.is_labor_calc === false
+          acct_before.calc_type === "labor" &&
+          acct_after.calc_type !== "labor"
         )
       ) {
         console.log(

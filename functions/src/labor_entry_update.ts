@@ -232,7 +232,7 @@ async function recalcGlAccount(
     .get();
 
   // create a labor flag => if no labor positions exist anymore, then this will stay false so that we flag the GL account correctly
-  let labor_calc_flag = false;
+  let labor_calc_flag = "entry";
   const updated_values = utils.getValuesArray();
   for (const curr_pos_doc of pos_snap.docs) {
     const curr_wages = (curr_pos_doc.data() as labor_model.positionDoc).wages;
@@ -240,7 +240,7 @@ async function recalcGlAccount(
     for (let idx = 0; idx < updated_values.length; idx++) {
       updated_values[idx] += curr_wages.values[idx];
     }
-    labor_calc_flag = true;
+    labor_calc_flag = "labor";
   }
 
   // update the account doc
@@ -262,6 +262,6 @@ async function recalcGlAccount(
   // otherwise take the first account (since there should only be one) and update!
   await acct_snap.docs[0].ref.update({
     values: updated_values,
-    is_labor_calc: labor_calc_flag,
+    calc_type: labor_calc_flag,
   });
 }

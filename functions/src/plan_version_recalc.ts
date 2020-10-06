@@ -43,13 +43,7 @@ export const planVersionRecalc = functions.runWith({maxInstances: 1}).firestore
         planId: context.params.planId,
         versionId: context.params.versionId,
       };
-
-      // Do not handle driver updates - J/K do handle driver updates as well
-      // if(nlevel_acct_after.is_driver_calc !==  undefined && nlevel_acct_after.is_driver_calc === true) {
-      //   console.log("Detected updated driver account, which I am not allowed to handle. Signing off :(");
-      //   return;
-      // }
-
+      
       // read the document again and print values from all updates
       const nlevel_snap = await snapshot.after.ref.get();
       if(!nlevel_snap.exists) throw new Error("Could not read updated document snapshot");
