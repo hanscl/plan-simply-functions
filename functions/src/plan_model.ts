@@ -64,3 +64,20 @@ interface parentRollup {
   acct: string;
   operation: number;
 }
+
+export interface duplicateVersionParams {
+  entity: string;
+  copy_from: {
+    plan_name: string;
+    version_name: string;
+  }
+  copy_to: {
+    plan_name: string;
+    version_name: string;
+  }
+  copy_options: {
+    values: boolean;
+    drivers: boolean;
+    labor: boolean;
+  }
+}

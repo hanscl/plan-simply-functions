@@ -2,6 +2,8 @@ import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import * as driver_model from "./driver_model";
 import * as view_model from "./view_model";
+import * as https_utils from "./https_utils";
+
 const cors = require("cors")({ origin: true });
 
 const db = admin.firestore();
@@ -30,7 +32,7 @@ export const getValidDriverAccounts = functions.https.onRequest(
         }
 
         //     let requestedUid = request.body.     // resource the user is requsting to modify
-        const authToken = validateHeader(request); // current user encrypted
+        const authToken = https_utils.validateHeader(request); // current user encrypted
 
         if (!authToken) {
           response.status(403).send("Unauthorized! Missing auth token!");
@@ -38,7 +40,7 @@ export const getValidDriverAccounts = functions.https.onRequest(
         }
 
         console.log(`USE THIS:[${authToken}]`);
-        const dec_token = await decodeAuthToken(authToken);
+        const dec_token = await https_utils.decodeAuthToken(authToken);
 
         if(dec_token === undefined) {
           response.status(403).send("Invalid token.");
@@ -183,27 +185,3 @@ function evaluateAccount(
   return acct_obj.can_select;
 }
 
-function validateHeader(req: functions.https.Request) {
-  if (
-    req.headers.authorization &&
-    req.headers.authorization.startsWith("Bearer ")
-  ) {
-    console.log("auth header found");
-    return req.headers.authorization.split("Bearer ")[1];
-  }
-
-  return "";
-}
-
-function decodeAuthToken(authToken: string) {
-  return admin
-    .auth()
-    .verifyIdToken(authToken)
-    .then((decodedToken) => {
-      // decode the current user's auth token
-      return decodedToken.uid;
-    })
-    .catch(reason => {
-      return undefined;
-    });
-}
