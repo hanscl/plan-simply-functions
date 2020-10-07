@@ -1,11 +1,14 @@
+import * as admin from "firebase-admin";
 import * as driver_model from "./driver_model";
 import * as entity_model from "./entity_model";
 import * as utils from "./utils";
 
+const db = admin.firestore();
+
 export async function driverDependencyBuild(
-  db: FirebaseFirestore.Firestore,
   context_params: driver_model.driverParamsAll,
-  driver_lst: driver_model.driverEntry[]
+  driver_lst: driver_model.driverEntry[],
+  driver_params: driver_model.driverParamsAll
 ) {
   try {
     /*** 1. LOAD ENTITY STRUCTURE AND PLAN DOCUMENTS */
@@ -41,6 +44,13 @@ export async function driverDependencyBuild(
       });
     }
 
+    // load driver account ids
+    const all_driver_accts: string[] = [];
+    const driver_acct_snap = await entity_doc_snap.ref.collection("drivers").doc(driver_params.version_id).collection("dept").get();
+    for (const drv_acct of driver_acct_snap.docs) {
+      all_driver_accts.push(drv_acct.id);
+    }
+
     /***** 2. PROCEED WITH DEPENDENCY BUILD *****/
 
     // remove static driver values from list so we only have accounts
@@ -54,7 +64,7 @@ export async function driverDependencyBuild(
     });
 
     // Recursive function to resolve all rollups
-    return resolveRollups(acct_list, entity, rollups, div_dict, acct_dict, groups);
+    return await resolveRollups(acct_list, entity, rollups, div_dict, acct_dict, groups, driver_params, all_driver_accts);
   } catch (error) {
     console.log("Error occured during driver dependency build: " + error);
     return;
@@ -148,31 +158,69 @@ function getRollupChildren(
 }
 
 /***** RESOLVE ROLLUPS - RECURSIVELY CALLED. CHECKS IF AN ACCOUNT IS A ROLLUP AND PROCEEDS ACCORDINGLY */
-function resolveRollups(
+async function resolveRollups(
   acct_lst: string[],
   entity: entity_model.entityDoc,
   rollups: entity_model.rollupObj[],
   div_dict: entity_model.divDict,
   acct_dict: entity_model.acctDict,
-  groups: entity_model.groupObj[]
-): string[] {
+  groups: entity_model.groupObj[],
+  driver_params: driver_model.driverParamsAll,
+  all_driver_accts: string[]
+): Promise<string[]> {
   let acct_lst_copy = acct_lst;
   for (let idx = acct_lst_copy.length - 1; idx >= 0; idx--) {
     if (acctIsRollup(acct_lst_copy[idx], entity, rollups)) {
       acct_lst_copy = acct_lst_copy
         .slice(0, idx)
         .concat(
-          resolveRollups(
+          await resolveRollups(
             getRollupChildren(acct_lst_copy[idx], entity, div_dict, groups, rollups, acct_dict),
             entity,
             rollups,
             div_dict,
             acct_dict,
-            groups
+            groups,
+            driver_params,
+            all_driver_accts
           ),
           acct_lst_copy.slice(idx + 1)
         );
+    } else {
+      // recursive call ends at n-level account => resolve driver dependency
+      if (all_driver_accts.includes(acct_lst_copy[idx])) {
+        acct_lst_copy = acct_lst_copy
+          .slice(0, idx)
+          .concat(
+            await resolveRollups(
+              await getDriverAccounts(acct_lst_copy[idx], driver_params),
+              entity,
+              rollups,
+              div_dict,
+              acct_dict,
+              groups,
+              driver_params,
+              all_driver_accts
+            ),
+            acct_lst_copy.slice(idx + 1)
+          );
+      }
     }
   }
   return acct_lst_copy;
+}
+
+async function getDriverAccounts(acct: string, driver_params: driver_model.driverParamsAll): Promise<string[]> {
+  const driver_doc = await db.doc(`entities/${driver_params.entity_id}/drivers/${driver_params.version_id}/dept/${acct}`).get();
+  if (!driver_doc.exists) throw new Error("Could not find driver document inside getDriverAccounts. That should not happen!");
+
+  const driver_list = (driver_doc.data() as driver_model.acctDriverDef).drivers;
+
+  // filter down to acct_types
+  const ret_acct_list: string[] = [];
+  for (const drv_entry of driver_list) {
+    if (drv_entry.type === "acct") ret_acct_list.push((drv_entry.entry as driver_model.driverAcct).id);
+  }
+
+  return ret_acct_list;
 }

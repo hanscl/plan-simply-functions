@@ -55,7 +55,7 @@ async function processDriverDocChange(snapshot: admin.firestore.QueryDocumentSna
   await driver_calc.driverCalcValue(acct_driver_definition, driver_params);
 
   /******** 2. UPDATE DRIVER DEPENDENCIES ***************/
-  const nlevel_ref_accts = await driver_dependencies.driverDependencyBuild(db, driver_params, acct_driver_definition.drivers);
+  const nlevel_ref_accts = await driver_dependencies.driverDependencyBuild(driver_params, acct_driver_definition.drivers, driver_params);
   if (nlevel_ref_accts === undefined) throw new Error("Account dependency build returned undefined");
   console.log(`Account list resolved from "${JSON.stringify(acct_driver_definition.drivers)}" to "${JSON.stringify(nlevel_ref_accts)}"`);
 
