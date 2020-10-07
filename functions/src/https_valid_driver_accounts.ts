@@ -37,6 +37,7 @@ export const getValidDriverAccounts = functions.https.onRequest(
           return;
         }
 
+        console.log(`USE THIS:[${authToken}]`);
         const dec_token = await decodeAuthToken(authToken);
 
         if(dec_token === undefined) {

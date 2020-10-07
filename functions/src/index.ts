@@ -7,6 +7,7 @@ export { planViewGenerate } from "./plan_view_generate";
 export { planVersionRecalc } from "./plan_version_recalc";
 export { entityHierarchyUpdate } from "./entity_update_hier";
 export { versionDocCreate } from "./version_create";
+export { createVersionFromExisting } from "./https_duplicate_version";
 
 // FIle Handling
 export { importDepartmentsFromCsv } from "./cloudstorage_import_depts";
