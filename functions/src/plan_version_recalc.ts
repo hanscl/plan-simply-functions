@@ -56,6 +56,11 @@ export const planVersionRecalc = functions
       // run with CURRENT SNAPSHOT ...
       nlevel_acct_after = nlevel_snap.data() as plan_model.accountDoc;
 
+      // TODO: Calculate stats => HOW?
+      if(nlevel_acct_after.acct_type === "STATS") {
+        return;
+      }
+
       // EXIT IF THIS IS AN INITIAL PLAN CALCULATION or rollup account level!
       if ((nlevel_acct_after.parent_rollup !== undefined && nlevel_acct_before.parent_rollup === undefined) || nlevel_acct_after.class === "rollup") {
         return;
