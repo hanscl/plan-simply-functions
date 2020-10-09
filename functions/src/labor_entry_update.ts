@@ -96,28 +96,6 @@ export const laborEntryUpdate = functions.firestore
           await recalcGlAccount(context_params, pos_doc_before);
       }
 
-      // If there are no more blank positions, add one more
-      // TODO: Remove when we have add additional labor positions in the UI
-      const pos_snap = await db
-        .collection(`entities/${context_params.entity_id}/labor/${context_params.version_id}/positions`)
-        .where("acct", "==", "")
-        .where("dept", "==", "")
-        .where("pos", "==", "")
-        .get();
-
-      if (pos_snap.empty) {
-        const empty_labor_pos: labor_model.positionDoc = {
-          pos: "",
-          acct: "",
-          dept: "",
-          fte_factor: 0,
-          ftes: { total: 0, values: utils.getValuesArray() },
-          rate: { annual: 0, hourly: 0 },
-          status: "Hourly",
-        };
-        await db.collection(`entities/${context_params.entity_id}/labor/${context_params.version_id}/positions`).add(empty_labor_pos);
-      
-      }
     } catch (error) {
       console.log(`Error occured while processing labor update: ${error}`);
     }

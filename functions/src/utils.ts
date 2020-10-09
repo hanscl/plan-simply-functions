@@ -8,11 +8,7 @@ export enum ReplacePosition {
   end = -1,
 }
 
-export function extractAcctFromFullAccount(
-  full_acct: string,
-  format_coll: string[],
-  param: string
-) {
+export function extractAcctFromFullAccount(full_acct: string, format_coll: string[], param: string) {
   const search_str = `@${param}@`;
 
   let placeholder = "";
@@ -24,10 +20,7 @@ export function extractAcctFromFullAccount(
     }
   }
 
-  if (placeholder === "")
-    throw new Error(
-      "[UTILS - extractAcctFromFullAccount] No matching account string found"
-    );
+  if (placeholder === "") throw new Error("[UTILS - extractAcctFromFullAccount] No matching account string found");
 
   //console.log(`placeholder string: ${placeholder}`);
 
@@ -65,10 +58,7 @@ export function extractAcctFromFullAccount(
   return acct;
 }
 
-export function buildFullAccountString(
-  format_str: string[],
-  components: entity_model.acctComponents
-) {
+export function buildFullAccountString(format_str: string[], components: entity_model.acctComponents) {
   const cmp_cnt = components.dept === undefined ? 3 : 4;
 
   // find the correct placeholder string
@@ -80,9 +70,7 @@ export function buildFullAccountString(
     }
   }
 
-  let ret_str = placeholder
-    .replace("@acct@", components.acct)
-    .replace("@div@", components.div);
+  let ret_str = placeholder.replace("@acct@", components.acct).replace("@div@", components.div);
   if (components.dept !== undefined) {
     ret_str = ret_str.replace("@dept@", components.dept);
   } else {
@@ -92,25 +80,16 @@ export function buildFullAccountString(
   return ret_str;
 }
 
-export function buildFixedAccountString(
-  format_str: string,
-  components: { div?: string; dept?: string; acct?: string }
-) {
+export function buildFixedAccountString(format_str: string, components: { div?: string; dept?: string; acct?: string }) {
   let full_account = format_str;
-  if (components.div !== undefined)
-    full_account = full_account.replace("@div@", components.div);
-  if (components.dept !== undefined)
-    full_account = full_account.replace("@dept@", components.dept);
-  if (components.acct !== undefined)
-    full_account = full_account.replace("@acct@", components.acct);
+  if (components.div !== undefined) full_account = full_account.replace("@div@", components.div);
+  if (components.dept !== undefined) full_account = full_account.replace("@dept@", components.dept);
+  if (components.acct !== undefined) full_account = full_account.replace("@acct@", components.acct);
 
   return full_account;
 }
 
-export function extractComponentsFromFullAccountString(
-  full_account: string,
-  format_coll: string[]
-): entity_model.acctComponents {
+export function extractComponentsFromFullAccountString(full_account: string, format_coll: string[]): entity_model.acctComponents {
   const div = extractAcctFromFullAccount(full_account, format_coll, "div");
   const acct = extractAcctFromFullAccount(full_account, format_coll, "acct");
   const dept = extractAcctFromFullAccount(full_account, format_coll, "dept");
@@ -122,11 +101,7 @@ export function extractComponentsFromFullAccountString(
   };
 }
 
-export function substituteEntityForRollup(
-  origText: string,
-  embed_maps: entity_model.entityEmbed[] | undefined,
-  entityId: string
-): string {
+export function substituteEntityForRollup(origText: string, embed_maps: entity_model.entityEmbed[] | undefined, entityId: string): string {
   if (embed_maps === undefined) return origText;
 
   const fltrd_dept_embeds = embed_maps.filter((embed_map) => {
@@ -136,10 +111,7 @@ export function substituteEntityForRollup(
   if (fltrd_dept_embeds.length < 1) return origText;
 
   if (fltrd_dept_embeds[0].pos === ReplacePosition.end) {
-    return `${origText.substring(
-      0,
-      origText.length - entityId.length
-    )}${entityId}`;
+    return `${origText.substring(0, origText.length - entityId.length)}${entityId}`;
   } else if (fltrd_dept_embeds[0].pos === ReplacePosition.start) {
     return `${entityId}${origText.substring(entityId.length)}`;
   }
@@ -147,12 +119,7 @@ export function substituteEntityForRollup(
   return "";
 }
 
-export async function deleteCollection(
-  collectionRef: FirebaseFirestore.CollectionReference<
-    FirebaseFirestore.DocumentData
-  >,
-  batchSize: number
-) {
+export async function deleteCollection(collectionRef: FirebaseFirestore.CollectionReference<FirebaseFirestore.DocumentData>, batchSize: number) {
   const query = collectionRef.orderBy("__name__").limit(batchSize);
 
   return new Promise((resolve, reject) => {
@@ -160,10 +127,7 @@ export async function deleteCollection(
   });
 }
 
-async function deleteQueryBatch(
-  query: FirebaseFirestore.Query<FirebaseFirestore.DocumentData>,
-  resolve: any
-) {
+async function deleteQueryBatch(query: FirebaseFirestore.Query<FirebaseFirestore.DocumentData>, resolve: any) {
   const snapshot = await query.get();
 
   const batchSize = snapshot.size;
@@ -216,9 +180,27 @@ function leapyear(year: number) {
 }
 
 export function getValuesArray(): number[] {
-  return [0,0,0,0,0,0,0,0,0,0,0,0]
+  return [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 }
 
 export function finRound(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+export function areValuesIdentical(vals1: number[], vals2: number[]): boolean {
+  if (vals1.length !== vals2.length) return false;
+
+  for (let idx = 0; idx < vals1.length; idx++) {
+    if (finRound(vals1[idx]) !== finRound(vals2[idx])) return false;
+  }
+
+  return true;
+}
+
+export function getTotalValues(values: number[]): number {
+  return finRound(
+    values.reduce((a, b) => {
+      return a + b;
+    }, 0)
+  );
 }
