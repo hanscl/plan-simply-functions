@@ -88,14 +88,16 @@ export const laborEntryUpdate = functions.firestore
       // write updated document
       await labor_snap.ref.collection("positions").doc(context_params.position_id).update(pos_doc_after);
 
+      // TODO VALIDATE
       // now update the gl account => ONLY if we have values for ACCT and DEPT
-      if (pos_doc_after.acct !== undefined && pos_doc_after.dept !== undefined) {
-        await recalcGlAccount(context_params, pos_doc_after);
-        // ... also if either ACCT/DEPT (or both) changed, then we need to recalculate the combination where the position was removed from
-        if (pos_doc_before.acct !== pos_doc_after.acct || pos_doc_before.dept !== pos_doc_after.dept)
-          await recalcGlAccount(context_params, pos_doc_before);
-      }
-
+      setTimeout(async () => {
+        if (pos_doc_after.acct !== undefined && pos_doc_after.dept !== undefined) {
+          await recalcGlAccount(context_params, pos_doc_after);
+          // ... also if either ACCT/DEPT (or both) changed, then we need to recalculate the combination where the position was removed from
+          if (pos_doc_before.acct !== pos_doc_after.acct || pos_doc_before.dept !== pos_doc_after.dept)
+            await recalcGlAccount(context_params, pos_doc_before);
+        }
+      }, 1000);
     } catch (error) {
       console.log(`Error occured while processing labor update: ${error}`);
     }

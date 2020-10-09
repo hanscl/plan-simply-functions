@@ -45,23 +45,6 @@ export const planVersionRecalc = functions
         versionId: context.params.versionId,
       };
 
-      // TODO: locking by period?
-      // prevent editing locked versions or accounts
-      const version_doc = await db.doc(`entities/${context_params.entityId}/plans/${context_params.planId}/versions/${context_params.versionId}`).get();
-      if (!version_doc.exists) throw new Error("Could not read version document. This must be a code error?");
-      const lock_status = (version_doc.data() as plan_model.versionDoc).is_locked;
-
-      if (lock_status.all === true || nlevel_acct_after.is_locked === true) {
-        // revert the monthly values if they are different from the total
-        if(utils.getTotalValues(nlevel_acct_after.values) !== utils.finRound(nlevel_acct_after.total)) {
-          console.log(`reverting attempted change of locked version or account`);
-          await version_doc.ref.collection("dept").doc(nlevel_acct_after.full_account).update({ values: nlevel_acct_before.values });
-        } else {
-          console.log(`locked version edit triggered, but no changed detected. EXITING`);
-          return;
-        }
-      }
-
       // read the document again and print values from all updates
       const nlevel_snap = await snapshot.after.ref.get();
       if (!nlevel_snap.exists) throw new Error("Could not read updated document snapshot");
