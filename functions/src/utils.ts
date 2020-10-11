@@ -204,3 +204,23 @@ export function getTotalValues(values: number[]): number {
     }, 0)
   );
 }
+
+
+export function getValueDiffsByMonth(vals_before: number[], vals_after: number[], diff_by_month: number[], months_changed: number[]): number | undefined {
+  // makes sure the arrays have the same length
+  if(vals_after.length !== vals_before.length) return undefined;
+
+  // initialize variables for tracking changes in monthly data
+   let diff_total = 0;
+
+   // calculate difference for each month and track which months changed
+   for (let periodIdx = 0; periodIdx < vals_before.length; periodIdx++) {
+    diff_by_month[periodIdx] = finRound(vals_after[periodIdx]) - finRound(vals_before[periodIdx]);
+     if (diff_by_month[periodIdx] !== 0) {
+       months_changed.push(periodIdx);
+       diff_total += diff_by_month[periodIdx];
+     }
+   }
+
+   return diff_total;
+}

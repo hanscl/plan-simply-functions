@@ -90,3 +90,15 @@ function performDriverCalc(operands: number[], operator: string): number {
   // if no valid operation, return failure value
   return -99.99;
 }
+
+export async function recalcDependentDrivers(entity_id: string, plan_id: string, version_id: string, ref_acct_id: string) {
+  const driver_acct_snap = await db.collection(`entities/${entity_id}/drivers/${version_id}/dept`).where("ref_accts", "array-contains", ref_acct_id).get();
+  if (driver_acct_snap.empty) return;
+
+  // loop through driver accounts and trigger a recalc for each
+  for (const driver_doc of driver_acct_snap.docs) {
+    const driver_def = driver_doc.data() as driver_model.acctDriverDef;
+
+    await driverCalcValue(driver_def, { acct_id: driver_doc.id, entity_id: entity_id, plan_id: plan_id, version_id: version_id });
+  }
+}
