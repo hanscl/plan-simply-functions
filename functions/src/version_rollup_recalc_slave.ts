@@ -53,25 +53,33 @@ export async function executeVersionRollupRecalc(recalc_params: recalcParams, re
     const curr_acct_doc = await recalc_tx.get(doc_refs.acct);
     const nlevel_acct_before = curr_acct_doc.data() as plan_model.accountDoc;
 
+    console.log(`Retrieved previous account: ${JSON.stringify(nlevel_acct_before)}. Updating values to: ${JSON.stringify(recalc_params.values)}`);
+
     // Do not calculate stats
-    if (nlevel_acct_before.acct_type === "STATS") return;
+    if (nlevel_acct_before.acct_type === "STATS") return undefined;
 
     // create object to track changes and get changes from utils module => throw error if difference cannot be calculated
     const acct_changes: acctChanges = {
       diff_by_month: [],
       diff_total: 0,
       months_changed: [],
-      operation: 0,
+      operation: 1,
     };
     const utils_ret = utils.getValueDiffsByMonth(nlevel_acct_before.values, recalc_params.values, acct_changes.diff_by_month, acct_changes.months_changed);
     if (utils_ret === undefined) throw new Error(`Utils.getValueDiffsByMonth returned undefined. Aborting versionRollupRecalc`);
+    acct_changes.diff_total = utils_ret;
+
+    console.log(`utils calculated differences: ${JSON.stringify(acct_changes)}`);
 
     // if there is no change across all 12 months, exit => this is important to avoid endless update triggers!!
-    if (acct_changes.months_changed.length === 0) return;
+    if (acct_changes.months_changed.length === 0) return undefined;
 
     // create a copy of the account, with new values & update the params object with the dept
-    const nlevel_acct_after = { ...nlevel_acct_before, total: acct_changes.diff_total, values: recalc_params.values };
+    const nlevel_acct_after = { ...nlevel_acct_before,  values: recalc_params.values };
+    nlevel_acct_after.total += acct_changes.diff_total;
     recalc_params.dept = nlevel_acct_after.dept;
+
+    console.log(`Updating nlevel account object to: ${JSON.stringify(nlevel_acct_after)}`);
 
     // save account reference & initialize update collection
     let currChildAcct: plan_model.accountDoc | undefined = nlevel_acct_after;
@@ -79,8 +87,11 @@ export async function executeVersionRollupRecalc(recalc_params: recalcParams, re
 
     // IF THERE IS NO PARENT ROLLUP, WE HAVE REACHED THE TOP LEVEL => END FUNCTION
     while (currChildAcct !== undefined && currChildAcct.parent_rollup !== undefined) {
+      console.log(`Calling update parent accounts with acct: ${JSON.stringify(currChildAcct)}`);
       currChildAcct = await updateParentAccounts(recalc_tx, doc_refs, currChildAcct, acct_changes, recalc_params, update_collection);
     }
+
+    console.log(`loop is done. Update array is: ${JSON.stringify(update_collection)}`);
 
     // Add updates to transaction
     for (const update_obj of update_collection) {

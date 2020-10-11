@@ -28,17 +28,26 @@ export async function beginVersionRollupRecalc(recalc_params: recalcParams, user
         db.doc(`entities/${recalc_params.entity_id}/plans/${recalc_params.plan_id}/versions/${recalc_params.version_id}`)
       );
 
+      // Abort if the version has not been initialized
+      if ((version_doc.data() as plan_model.versionDoc).calculated !== true) {
+        console.log(`Version has never been fully calculated/initialized. Aborting incremental recalc`);
+        return undefined;
+      }
+
       // perform recalc in here to ensure no other update runs concurrently on this version
-      const acct_changes = await version_recalc_slave.executeVersionRollupRecalc(recalc_params, recalc_tx);
+      const recalc_res = await version_recalc_slave.executeVersionRollupRecalc(recalc_params, recalc_tx);
 
-      recalc_tx.update(version_doc.ref, { last_update: FirebaseFirestore.Timestamp.now() });
+      recalc_tx.update(version_doc.ref, { last_update: admin.firestore.Timestamp.now() });
 
-      return acct_changes;
+      return recalc_res;
     });
 
     /**** ADDITIONAL CALCS FOLLOW BELOW => THESE ARE DONE OUTSIDE OF THIS TX TO NOT LOCK THE VERSION LONGER THAN NEEDED */
     // now update the account in any direct parent/rollup entity
-    if (acct_changes === undefined) throw new Error(`Version Recalc did not return any acct changes to be processed in parent entities`);
+    if (acct_changes === undefined) {
+      console.log("Acct values did not change. Nothing else to be done");
+      return;
+    }
     await rollup_entity_account_update.updateAccountInRollupEntities(recalc_params, acct_changes);
 
     // TODO move out of this functino to avoid slow updates
@@ -46,7 +55,7 @@ export async function beginVersionRollupRecalc(recalc_params: recalcParams, user
 
     console.log(`Completed updating acct with values: ${JSON.stringify(recalc_params.values)}`);
   } catch (error) {
-    console.log(`Transaction failure at beginVersionRollupRecalc: ${error}`);
+    console.log(`Failure at beginVersionRollupRecalc: ${error}`);
   }
 }
 
