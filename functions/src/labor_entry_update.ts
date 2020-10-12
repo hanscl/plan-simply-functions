@@ -237,6 +237,7 @@ async function recalcGlAccount(context_params: contextParams, updated_position: 
   // });
 
   // and request a recalc
+  console.log(`calling recalc rollups with values: ${updated_values}`);
   await version_recalc.beginVersionRollupRecalc(
     {
       acct_id: full_acct,
