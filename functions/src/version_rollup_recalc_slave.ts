@@ -103,7 +103,7 @@ export async function executeVersionRollupRecalc(recalc_params: recalcParams, re
 
     // IF THERE IS NO PARENT ROLLUP, WE HAVE REACHED THE TOP LEVEL => END FUNCTION
     while (currChildAcct !== undefined && currChildAcct.parent_rollup !== undefined) {
-      console.log(`Calling update parent accounts for the ${++ctr}th time. Acct: ${JSON.stringify(currChildAcct)}`);
+      // console.log(`Calling update parent accounts for the ${++ctr}th time. Acct: ${JSON.stringify(currChildAcct)}`);
       currChildAcct = await updateParentAccounts(recalc_tx, doc_refs, currChildAcct, acct_changes, recalc_params, update_collection);
     }
 
