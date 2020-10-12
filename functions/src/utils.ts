@@ -205,22 +205,30 @@ export function getTotalValues(values: number[]): number {
   );
 }
 
+export function addValuesByMonth(vals1: number[], vals2: number[]): number[] {
+  const ret_array = getValuesArray();
+  if (vals1.length !== vals2.length) return ret_array;
+  for (let i = 0; i < vals1.length; i++) {
+    ret_array[i] = vals1[i] + vals2[i];
+  }
+  return ret_array;
+}
 
 export function getValueDiffsByMonth(vals_before: number[], vals_after: number[], diff_by_month: number[], months_changed: number[]): number | undefined {
   // makes sure the arrays have the same length
-  if(vals_after.length !== vals_before.length) return undefined;
+  if (vals_after.length !== vals_before.length) return undefined;
 
   // initialize variables for tracking changes in monthly data
-   let diff_total = 0;
+  let diff_total = 0;
 
-   // calculate difference for each month and track which months changed
-   for (let periodIdx = 0; periodIdx < vals_before.length; periodIdx++) {
+  // calculate difference for each month and track which months changed
+  for (let periodIdx = 0; periodIdx < vals_before.length; periodIdx++) {
     diff_by_month[periodIdx] = finRound(vals_after[periodIdx]) - finRound(vals_before[periodIdx]);
-     if (diff_by_month[periodIdx] !== 0) {
-       months_changed.push(periodIdx);
-       diff_total += diff_by_month[periodIdx];
-     }
-   }
+    if (diff_by_month[periodIdx] !== 0) {
+      months_changed.push(periodIdx);
+      diff_total += diff_by_month[periodIdx];
+    }
+  }
 
-   return diff_total;
+  return diff_total;
 }

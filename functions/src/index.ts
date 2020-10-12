@@ -9,7 +9,6 @@ export { entityHierarchyUpdate } from "./entity_update_hier";
 export { versionDocCreate } from "./version_create";
 export { createVersionFromExisting } from "./https_duplicate_version";
 export { saveItemizedEntry } from "./https_itemized_entry";
-export { beginVersionRollupRecalc } from "./version_rollup_recalc_master";
 
 // FIle Handling
 export { importDepartmentsFromCsv } from "./cloudstorage_import_depts";
@@ -37,5 +36,3 @@ export { sendPasswordResetLink } from "./https_password_reset_email";
 export { laborEntryUpdate } from "./labor_entry_update";
 export { laborRemoveAccount } from "./labor_remove_account";
 
-// TEST
-export { testRecalc } from "./test_recalc";

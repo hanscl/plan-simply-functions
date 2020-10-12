@@ -27,7 +27,7 @@ interface parentAccounts {
   acct_obj?: plan_model.accountDoc;
 }
 
-interface acctChanges {
+export interface acctChanges {
   diff_by_month: number[];
   diff_total: number;
   months_changed: number[];
@@ -40,7 +40,7 @@ interface updateObj {
   total: number;
 }
 
-export async function executeVersionRollupRecalc(recalc_params: recalcParams, recalc_tx: FirebaseFirestore.Transaction) {
+export async function executeVersionRollupRecalc(recalc_params: recalcParams, recalc_tx: FirebaseFirestore.Transaction, passed_acct_changes?: acctChanges) {
   try {
     // get the version, plan and account references
     const entity_ref = db.doc(`entities/${recalc_params.entity_id}`);
@@ -58,16 +58,30 @@ export async function executeVersionRollupRecalc(recalc_params: recalcParams, re
     // Do not calculate stats
     if (nlevel_acct_before.acct_type === "STATS") return undefined;
 
-    // create object to track changes and get changes from utils module => throw error if difference cannot be calculated
-    const acct_changes: acctChanges = {
-      diff_by_month: [],
-      diff_total: 0,
-      months_changed: [],
-      operation: 1,
-    };
-    const utils_ret = utils.getValueDiffsByMonth(nlevel_acct_before.values, recalc_params.values, acct_changes.diff_by_month, acct_changes.months_changed);
-    if (utils_ret === undefined) throw new Error(`Utils.getValueDiffsByMonth returned undefined. Aborting versionRollupRecalc`);
-    acct_changes.diff_total = utils_ret;
+    let acct_changes = passed_acct_changes;
+    if (acct_changes === undefined) {
+      // create object to track changes and get changes from utils module => throw error if difference cannot be calculated
+      acct_changes = {
+        diff_by_month: utils.getValuesArray(),
+        diff_total: 0,
+        months_changed: [],
+        operation: 1,
+      };
+      const utils_ret = utils.getValueDiffsByMonth(
+        nlevel_acct_before.values,
+        recalc_params.values,
+        acct_changes.diff_by_month,
+        acct_changes.months_changed
+      );
+      if (utils_ret === undefined) throw new Error(`Utils.getValueDiffsByMonth returned undefined. Aborting versionRollupRecalc`);
+      acct_changes.diff_total = utils_ret;
+    }
+    else {
+      // set the recalc params to the new value 
+      recalc_params.values = utils.addValuesByMonth(nlevel_acct_before.values,  acct_changes.diff_by_month); 
+      // reset operation to 1
+      acct_changes.operation = 1;
+    }
 
     console.log(`utils calculated differences: ${JSON.stringify(acct_changes)}`);
 
@@ -119,7 +133,6 @@ async function updateParentAccounts(
 ): Promise<plan_model.accountDoc | undefined> {
   const parent_accounts: parentAccounts[] = [];
 
-  console.log(`starting parentUpdate`);
   if (childAccount.parent_rollup !== undefined && childAccount.dept !== undefined) {
     // add dept rollup to list
     const dept_rollup_acctId = childAccount.full_account.replace(childAccount.acct, childAccount.parent_rollup.acct);
@@ -135,11 +148,9 @@ async function updateParentAccounts(
 
     // loop through the parent acocunts (div & dept)
     for (const parent_acct of parent_accounts) {
-      console.log(`before get parent_acct`);
       const acct_snap = await recalc_tx.get(
         doc_refs.plan.collection("versions").doc(`${recalc_params.version_id}/${parent_acct.type}/${parent_acct.acct_id}`)
       );
-      console.log(`after get parent_acct`);
       if (!acct_snap.exists) continue;
 
       const acct_obj = acct_snap.data() as plan_model.accountDoc;
@@ -155,14 +166,11 @@ async function updateParentAccounts(
         ret_acct_obj = acct_obj;
         // also try to find group accounts and process those
 
-        console.log(`starting updateGroupAccounts`);
         await updateGroupAccounts(recalc_tx, recalc_params, doc_refs, parent_acct.acct_id, update_collection, acct_changes);
         // also process P&L accounts
-        console.log(`starting updatePnlAggregates`);
         await updatePnlAggregates(recalc_tx, recalc_params, doc_refs, parent_acct.acct_id, update_collection, acct_changes);
       } else if (parent_acct.type === "div") {
         // also process P&L accounts
-        console.log(`starting updatePnlAggregates`);
         await updatePnlAggregates(recalc_tx, recalc_params, doc_refs, parent_acct.acct_id, update_collection, acct_changes);
       }
     }
@@ -190,9 +198,7 @@ async function updateGroupAccounts(
   acct_changes: acctChanges
 ) {
   // find any group accounts that contain the parent account
-  console.log(`before get group child acct`);
   const group_parents_snap = await recalc_tx.get(doc_refs.version.collection("dept").where("group_children", "array-contains", group_child_acct));
-  console.log(`after get group child acct`);
 
   for (const group_parent_doc of group_parents_snap.docs) {
     const acct_obj = group_parent_doc.data() as plan_model.accountDoc;
@@ -213,9 +219,7 @@ async function updatePnlAggregates(
   update_collection: updateObj[],
   acct_changes: acctChanges
 ) {
-  console.log(`before get pnl doc`);
   const pnl_agg_snap = await recalc_tx.get(doc_refs.version.collection("pnl").where("child_accts", "array-contains", div_account_id));
-  console.log(`after get pnl doc`);
 
   for (const pnl_doc of pnl_agg_snap.docs) {
     const pnl_obj = pnl_doc.data() as view_model.pnlAggregateDoc;

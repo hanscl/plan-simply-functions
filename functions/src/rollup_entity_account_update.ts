@@ -1,7 +1,7 @@
 import * as admin from "firebase-admin";
-import * as plan_model from "./plan_model";
 import * as entity_model from "./entity_model";
 import * as utils from "./utils";
+import * as version_recalc from "./version_rollup_recalc_master";
 
 interface recalcParams {
   entity_id: string;
@@ -42,41 +42,48 @@ export async function updateAccountInRollupEntities(recalc_params: recalcParams,
       const rollup_plan_snaps = await rollup_entity_doc.ref.collection("plans").get();
 
       for (const rollup_plan_doc of rollup_plan_snaps.docs) {
-        await db.runTransaction(async (version_tx) => {
-          const rollup_version_snaps = await version_tx.get(
-            rollup_plan_doc.ref.collection("versions").where("child_version_ids", "array-contains", recalc_params.version_id)
-          );
+        const rollup_version_snaps = await rollup_plan_doc.ref
+          .collection("versions")
+          .where("child_version_ids", "array-contains", recalc_params.version_id)
+          .get();
 
-          for (const rollup_version_doc of rollup_version_snaps.docs) {
-            const acct_cmpnts = utils.extractComponentsFromFullAccountString(recalc_params.acct_id, [entity_obj.full_account]);
+        for (const rollup_version_doc of rollup_version_snaps.docs) {
+          const acct_cmpnts = utils.extractComponentsFromFullAccountString(recalc_params.acct_id, [entity_obj.full_account]);
 
-            if (recalc_params.dept === undefined)
-              throw new Error(`Dept not defined for account ${recalc_params.acct_id} in version ${recalc_params.version_id}`);
+          if (recalc_params.dept === undefined)
+            throw new Error(`Dept not defined for account ${recalc_params.acct_id} in version ${recalc_params.version_id}`);
 
-            // convert the dept string to replace the entity => IMPORTANT: update the utils to evaluate the embeds array for undefined and the field!!
-            const rollup_dept_id = utils.substituteEntityForRollup(recalc_params.dept, rollup_entity.entity_embeds, rollup_entity.number);
+          // convert the dept string to replace the entity => IMPORTANT: update the utils to evaluate the embeds array for undefined and the field!!
+          const rollup_dept_id = utils.substituteEntityForRollup(recalc_params.dept, rollup_entity.entity_embeds, rollup_entity.number);
 
-            // create a new full account string
-            const rollup_full_account = utils.buildFullAccountString([rollup_entity.full_account], { ...acct_cmpnts, dept: rollup_dept_id });
+          // create a new full account string
+          const rollup_full_account = utils.buildFullAccountString([rollup_entity.full_account], { ...acct_cmpnts, dept: rollup_dept_id });
 
-            // query the account from the rollup entity
-            const rollup_acct_snap = await version_tx.get(rollup_version_doc.ref.collection("dept").doc(rollup_full_account));
+          // query the account from the rollup entity
+          const rollup_acct_snap = await rollup_version_doc.ref.collection("dept").doc(rollup_full_account).get();
 
-            if (!rollup_acct_snap.exists) {
-              console.log(`Account ${rollup_full_account} not found in version ${rollup_version_doc.id} for entity ${rollup_entity_doc.id}`);
-              continue;
-            }
-
-            const rollup_account = rollup_acct_snap.data() as plan_model.accountDoc;
-
-            for (const idx of acct_changes.months_changed) {
-              rollup_account.values[idx] += acct_changes.diff_by_month[idx];
-            }
-
-            // TODO call new update function
-            version_tx.update(rollup_acct_snap.ref, { values: rollup_account.values });
+          if (!rollup_acct_snap.exists) {
+            console.log(`Account ${rollup_full_account} not found in version ${rollup_version_doc.id} for entity ${rollup_entity_doc.id}`);
+            continue;
           }
-        });
+
+        //   const rollup_account = rollup_acct_snap.data() as plan_model.accountDoc;
+
+        //   for (const idx of acct_changes.months_changed) {
+        //     rollup_account.values[idx] += acct_changes.diff_by_month[idx];
+        //   }
+
+          // TODO call new update function
+          //version_tx.update(rollup_acct_snap.ref, { values: rollup_account.values });
+
+          console.log(`calling beginVersionRollupRecalc from updateAccountInRollupEntities`);
+          // update via function call
+          await version_recalc.beginVersionRollupRecalc(
+            { entity_id: rollup_entity_doc.id, acct_id: rollup_full_account, plan_id: rollup_plan_doc.id, version_id: rollup_version_doc.id, values: [] },
+            false,
+            acct_changes
+          );
+        }
       }
     }
   } catch (error) {

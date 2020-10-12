@@ -15,8 +15,8 @@ interface recalcParams {
   values: number[];
   dept?: string;
 }
-
-export async function beginVersionRollupRecalc(recalc_params: recalcParams, user_initiated: boolean) {
+ 
+export async function beginVersionRollupRecalc(recalc_params: recalcParams, user_initiated: boolean, passed_acct_changes?: version_recalc_slave.acctChanges) {
   try {
     // Begin by checking if version editing is allowed
     console.log(`calling isUpdateAllowed with user_init: ${user_initiated} and ${JSON.stringify(recalc_params)}`);
@@ -39,7 +39,7 @@ export async function beginVersionRollupRecalc(recalc_params: recalcParams, user
       }
 
       // perform recalc in here to ensure no other update runs concurrently on this version
-      const recalc_res = await version_recalc_slave.executeVersionRollupRecalc(recalc_params, recalc_tx);
+      const recalc_res = await version_recalc_slave.executeVersionRollupRecalc(recalc_params, recalc_tx, passed_acct_changes);
 
       recalc_tx.update(version_doc.ref, { last_update: admin.firestore.Timestamp.now() });
 
