@@ -31,6 +31,16 @@ export const laborEntryUpdate = functions.firestore
       console.log(`Position doc before: ${JSON.stringify(pos_doc_before)}`);
       console.log(`Position doc after: ${JSON.stringify(pos_doc_after)}`);
 
+      // Save plan id ...
+      const labor_snap = await db.doc(`entities/${context_params.entity_id}/labor/${context_params.version_id}`).get();
+      if (!labor_snap.exists) throw new Error(`Could not get labor doc with version id ${context_params.version_id}. Fatal Error.`);
+      context_params.plan_id = (labor_snap.data() as labor_model.laborVersionDoc).plan_id;
+      // ... and also get the plan document
+      const plan_snap = await db.doc(`entities/${context_params.entity_id}/plans/${context_params.plan_id}`).get();
+      if (!plan_snap.exists) throw new Error(`Plan document ${context_params.plan_id} does not exists for entity ${context_params.entity_id}. Exiting.`);
+      const plan_doc = plan_snap.data() as plan_model.planDoc;
+
+
       if (pos_doc_after === undefined && pos_doc_before !== undefined && pos_doc_before.dept !== undefined && pos_doc_before.acct !== undefined) {
         await recalcGlAccount(context_params, pos_doc_before);
         return;
@@ -83,15 +93,6 @@ export const laborEntryUpdate = functions.firestore
           }
         }
       }
-
-      // Save plan id ...
-      const labor_snap = await db.doc(`entities/${context_params.entity_id}/labor/${context_params.version_id}`).get();
-      if (!labor_snap.exists) throw new Error(`Could not get labor doc with version id ${context_params.version_id}. Fatal Error.`);
-      context_params.plan_id = (labor_snap.data() as labor_model.laborVersionDoc).plan_id;
-      // ... and also get the plan document
-      const plan_snap = await db.doc(`entities/${context_params.entity_id}/plans/${context_params.plan_id}`).get();
-      if (!plan_snap.exists) throw new Error(`Plan document ${context_params.plan_id} does not exists for entity ${context_params.entity_id}. Exiting.`);
-      const plan_doc = plan_snap.data() as plan_model.planDoc;
 
       const days_in_months = utils.getDaysInMonth(plan_doc.begin_year, plan_doc.begin_month);
       console.log(`Days in plan months are: ${JSON.stringify(days_in_months)}`);

@@ -15,8 +15,12 @@ interface recalcParams {
   values: number[];
   dept?: string;
 }
- 
-export async function beginVersionRollupRecalc(recalc_params: recalcParams, user_initiated: boolean, passed_acct_changes?: version_recalc_slave.acctChanges) {
+
+export async function beginVersionRollupRecalc(
+  recalc_params: recalcParams,
+  user_initiated: boolean,
+  passed_acct_changes?: version_recalc_slave.acctChanges
+) {
   try {
     // Begin by checking if version editing is allowed
     console.log(`calling isUpdateAllowed with user_init: ${user_initiated} and ${JSON.stringify(recalc_params)}`);
@@ -24,13 +28,18 @@ export async function beginVersionRollupRecalc(recalc_params: recalcParams, user
       console.log(`user initiated and no updated allowed. Exit`);
       return;
     }
-  
+
     console.log(`Before Transaction: Updating acct ${recalc_params.acct_id} to ${JSON.stringify(recalc_params.values)}`);
     // begin transaction - lock the version document until we're done
     const acct_changes = await db.runTransaction(async (recalc_tx) => {
       const version_doc = await recalc_tx.get(
         db.doc(`entities/${recalc_params.entity_id}/plans/${recalc_params.plan_id}/versions/${recalc_params.version_id}`)
       );
+
+      if (!version_doc.exists)
+        throw new Error(
+          `Unable to locate version_doc at: entities/${recalc_params.entity_id}/plans/${recalc_params.plan_id}/versions/${recalc_params.version_id}`
+        );
 
       // Abort if the version has not been initialized
       if ((version_doc.data() as plan_model.versionDoc).calculated !== true) {
