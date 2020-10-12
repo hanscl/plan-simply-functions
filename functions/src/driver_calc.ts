@@ -2,34 +2,40 @@ import * as admin from "firebase-admin";
 import * as driver_model from "./driver_model";
 import * as plan_model from "./plan_model";
 import * as utils from "./utils";
+import * as version_recalc from "./version_rollup_recalc_master";
 
 const db = admin.firestore();
 
 export async function driverCalcValue(driver_def: driver_model.acctDriverDef, driver_params: driver_model.driverParamsAll) {
   try {
-    await db.runTransaction(async (driver_tx) => {
+  //  await db.runTransaction(async (driver_tx) => {
       // (1) Resolve the first driver to a numbers array (call get AccoutnValuye)
       console.log(`before loop: ${JSON.stringify(driver_def)}`);
-      let last_result: number[] = await getAccountValue(driver_tx, driver_def.drivers[0], driver_params);
+      let last_result: number[] = await getAccountValue(undefined, driver_def.drivers[0], driver_params);
 
       for (let idx = 0; idx < driver_def.operations.length; idx++) {
         console.log(`inside loop with index ${idx}: ${JSON.stringify(driver_def)}`);
-        last_result = await processDriverCombination(driver_tx, driver_params, last_result, driver_def.operations[idx], driver_def.drivers[idx + 1]);
+        last_result = await processDriverCombination(undefined, driver_params, last_result, driver_def.operations[idx], driver_def.drivers[idx + 1]);
       }
 
       // get the document reference and update using transaction
-      const acct_doc_ref = db.doc(
-        `entities/${driver_params.entity_id}/plans/${driver_params.plan_id}/versions/${driver_params.version_id}/dept/${driver_params.acct_id}`
-      );
-      driver_tx.update(acct_doc_ref, { values: last_result, calc_type: "driver" });
-    });
+      // const acct_doc_ref = db.doc(
+      //   `entities/${driver_params.entity_id}/plans/${driver_params.plan_id}/versions/${driver_params.version_id}/dept/${driver_params.acct_id}`
+      // );
+      //driver_tx.update(acct_doc_ref, { values: last_result, calc_type: "driver" });
+      // call our new manual update function
+
+      console.log(`calling beginVersionROllupCalc with: ${JSON.stringify({ ...driver_params, values: last_result })}`);
+
+      await version_recalc.beginVersionRollupRecalc({ ...driver_params, values: last_result }, false);
+ //   });
   } catch (e) {
     console.log("Transaction failure:", e);
   }
 }
 
 async function processDriverCombination(
-  driver_tx: FirebaseFirestore.Transaction,
+  driver_tx: FirebaseFirestore.Transaction | undefined,
   driver_params: driver_model.driverParamsAll,
   first_operand: number[],
   operation: "add" | "sub" | "mlt" | "dvs" | "pct",
@@ -49,7 +55,7 @@ async function processDriverCombination(
 }
 
 async function getAccountValue(
-  driver_tx: FirebaseFirestore.Transaction,
+  driver_tx: FirebaseFirestore.Transaction | undefined,
   driver_entry: driver_model.driverEntry,
   driver_params: driver_model.driverParamsAll
 ) {
@@ -64,7 +70,7 @@ async function getAccountValue(
   // query the accounts
   const version_str = `entities/${driver_params.entity_id}/plans/${driver_params.plan_id}/versions/${driver_params.version_id}`;
   const acct_ref = db.doc(`${version_str}/${driver_account.level}/${driver_account.id}`);
-  const acct_doc = await driver_tx.get(acct_ref);
+  const acct_doc = await acct_ref.get(); // removed tx
 
   // confirm we received a doc
   if (!acct_doc.exists)

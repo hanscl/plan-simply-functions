@@ -12,6 +12,7 @@ export interface positionDoc {
   fte_factor?: number;
   wages?: laborCalc;
   ftes?: laborCalc;
+  is_updating?: boolean;
 }
 
 interface rateMap {

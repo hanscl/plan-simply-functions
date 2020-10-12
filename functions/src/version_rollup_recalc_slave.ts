@@ -75,7 +75,7 @@ export async function executeVersionRollupRecalc(recalc_params: recalcParams, re
     if (acct_changes.months_changed.length === 0) return undefined;
 
     // create a copy of the account, with new values & update the params object with the dept
-    const nlevel_acct_after = { ...nlevel_acct_before,  values: recalc_params.values };
+    const nlevel_acct_after = { ...nlevel_acct_before, values: recalc_params.values };
     nlevel_acct_after.total += acct_changes.diff_total;
     recalc_params.dept = nlevel_acct_after.dept;
 
@@ -85,9 +85,11 @@ export async function executeVersionRollupRecalc(recalc_params: recalcParams, re
     let currChildAcct: plan_model.accountDoc | undefined = nlevel_acct_after;
     const update_collection: updateObj[] = [];
 
+    let ctr = 0;
+
     // IF THERE IS NO PARENT ROLLUP, WE HAVE REACHED THE TOP LEVEL => END FUNCTION
     while (currChildAcct !== undefined && currChildAcct.parent_rollup !== undefined) {
-      console.log(`Calling update parent accounts with acct: ${JSON.stringify(currChildAcct)}`);
+      console.log(`Calling update parent accounts for the ${++ctr}th time. Acct: ${JSON.stringify(currChildAcct)}`);
       currChildAcct = await updateParentAccounts(recalc_tx, doc_refs, currChildAcct, acct_changes, recalc_params, update_collection);
     }
 
@@ -117,6 +119,7 @@ async function updateParentAccounts(
 ): Promise<plan_model.accountDoc | undefined> {
   const parent_accounts: parentAccounts[] = [];
 
+  console.log(`starting parentUpdate`);
   if (childAccount.parent_rollup !== undefined && childAccount.dept !== undefined) {
     // add dept rollup to list
     const dept_rollup_acctId = childAccount.full_account.replace(childAccount.acct, childAccount.parent_rollup.acct);
@@ -132,9 +135,11 @@ async function updateParentAccounts(
 
     // loop through the parent acocunts (div & dept)
     for (const parent_acct of parent_accounts) {
+      console.log(`before get parent_acct`);
       const acct_snap = await recalc_tx.get(
         doc_refs.plan.collection("versions").doc(`${recalc_params.version_id}/${parent_acct.type}/${parent_acct.acct_id}`)
       );
+      console.log(`after get parent_acct`);
       if (!acct_snap.exists) continue;
 
       const acct_obj = acct_snap.data() as plan_model.accountDoc;
@@ -149,11 +154,15 @@ async function updateParentAccounts(
         // save for returning if dept
         ret_acct_obj = acct_obj;
         // also try to find group accounts and process those
+
+        console.log(`starting updateGroupAccounts`);
         await updateGroupAccounts(recalc_tx, recalc_params, doc_refs, parent_acct.acct_id, update_collection, acct_changes);
         // also process P&L accounts
+        console.log(`starting updatePnlAggregates`);
         await updatePnlAggregates(recalc_tx, recalc_params, doc_refs, parent_acct.acct_id, update_collection, acct_changes);
       } else if (parent_acct.type === "div") {
         // also process P&L accounts
+        console.log(`starting updatePnlAggregates`);
         await updatePnlAggregates(recalc_tx, recalc_params, doc_refs, parent_acct.acct_id, update_collection, acct_changes);
       }
     }
@@ -181,7 +190,9 @@ async function updateGroupAccounts(
   acct_changes: acctChanges
 ) {
   // find any group accounts that contain the parent account
+  console.log(`before get group child acct`);
   const group_parents_snap = await recalc_tx.get(doc_refs.version.collection("dept").where("group_children", "array-contains", group_child_acct));
+  console.log(`after get group child acct`);
 
   for (const group_parent_doc of group_parents_snap.docs) {
     const acct_obj = group_parent_doc.data() as plan_model.accountDoc;
@@ -202,7 +213,9 @@ async function updatePnlAggregates(
   update_collection: updateObj[],
   acct_changes: acctChanges
 ) {
+  console.log(`before get pnl doc`);
   const pnl_agg_snap = await recalc_tx.get(doc_refs.version.collection("pnl").where("child_accts", "array-contains", div_account_id));
+  console.log(`after get pnl doc`);
 
   for (const pnl_doc of pnl_agg_snap.docs) {
     const pnl_obj = pnl_doc.data() as view_model.pnlAggregateDoc;

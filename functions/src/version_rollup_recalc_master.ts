@@ -19,8 +19,12 @@ interface recalcParams {
 export async function beginVersionRollupRecalc(recalc_params: recalcParams, user_initiated: boolean) {
   try {
     // Begin by checking if version editing is allowed
-    if (user_initiated || !isUpdatedAllowed(recalc_params)) return;
-
+    console.log(`calling isUpdateAllowed with user_init: ${user_initiated} and ${JSON.stringify(recalc_params)}`);
+    if (user_initiated && !(await isUpdatedAllowed(recalc_params))) {
+      console.log(`user initiated and no updated allowed. Exit`);
+      return;
+    }
+  
     console.log(`Before Transaction: Updating acct ${recalc_params.acct_id} to ${JSON.stringify(recalc_params.values)}`);
     // begin transaction - lock the version document until we're done
     const acct_changes = await db.runTransaction(async (recalc_tx) => {
@@ -60,26 +64,33 @@ export async function beginVersionRollupRecalc(recalc_params: recalcParams, user
 }
 
 async function isUpdatedAllowed(recalc_params: recalcParams): Promise<boolean> {
-  // (1) Check version lock
-  const version_doc = await db.doc(`entities/${recalc_params.entity_id}/plans/${recalc_params.plan_id}/versions/${recalc_params.version_id}`).get();
-  if (!version_doc.exists) throw new Error("Could not read version document. This must be a code error?");
-  const version = version_doc.data() as plan_model.versionDoc;
-  if (version.is_locked.all === true) return false;
+  try {
+    // (1) Check version lock
+    const version_doc = await db.doc(`entities/${recalc_params.entity_id}/plans/${recalc_params.plan_id}/versions/${recalc_params.version_id}`).get();
+    if (!version_doc.exists) throw new Error("Could not read version document. This must be a code error?");
+    const version = version_doc.data() as plan_model.versionDoc;
+    console.log(`update allowed check version doc: ${JSON.stringify(version)}`);
+    if (version.is_locked.all === true) return false;
 
-  // (2) Check account lock
-  const acct_doc = await version_doc.ref.collection("dept").doc(recalc_params.acct_id).get();
-  if (!acct_doc.exists) throw new Error("Could not read account document. This must be a code error?");
-  const acct_obj = acct_doc.data() as plan_model.accountDoc;
-  if (acct_obj.is_locked === true) return false;
+    console.log(`checking account lock`);
+    // (2) Check account lock
+    const acct_doc = await version_doc.ref.collection("dept").doc(recalc_params.acct_id).get();
+    if (!acct_doc.exists) throw new Error("Could not read account document. This must be a code error?");
+    const acct_obj = acct_doc.data() as plan_model.accountDoc;
+    if (acct_obj.is_locked === true) return false;
 
-  // (3) Check period (calc differences)
-  const diff_by_month: number[] = [];
-  const months_changed: number[] = [];
-  if (utils.getValueDiffsByMonth(acct_obj.values, recalc_params.values, diff_by_month, months_changed) === undefined) return false;
-  for (const idx of months_changed) {
-    if (version.is_locked.periods[idx] === true) return false;
+    // (3) Check period (calc differences)
+    const diff_by_month: number[] = [];
+    const months_changed: number[] = [];
+    if (utils.getValueDiffsByMonth(acct_obj.values, recalc_params.values, diff_by_month, months_changed) === undefined) return false;
+    for (const idx of months_changed) {
+      if (version.is_locked.periods[idx] === true) return false;
+    }
+
+    console.log(`Version editing allowed for ${recalc_params.entity_id}:${recalc_params.version_id}:${recalc_params.acct_id}`);
+    return true;
+  } catch (error) {
+    console.log(`Error occurred while checking if udpate is allowed`);
+    return false;
   }
-
-  console.log(`Version editing allowed for ${recalc_params.entity_id}:${recalc_params.version_id}:${recalc_params.acct_id}`);
-  return true;
 }

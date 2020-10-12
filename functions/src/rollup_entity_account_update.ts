@@ -73,6 +73,7 @@ export async function updateAccountInRollupEntities(recalc_params: recalcParams,
               rollup_account.values[idx] += acct_changes.diff_by_month[idx];
             }
 
+            // TODO call new update function
             version_tx.update(rollup_acct_snap.ref, { values: rollup_account.values });
           }
         });

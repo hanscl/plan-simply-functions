@@ -3,6 +3,8 @@ import * as admin from "firebase-admin";
 import * as labor_model from "./labor_model";
 import * as plan_model from "./plan_model";
 import * as utils from "./utils";
+import * as entity_model from "./entity_model";
+import * as version_recalc from "./version_rollup_recalc_master";
 
 const db = admin.firestore();
 
@@ -26,7 +28,20 @@ export const laborEntryUpdate = functions.firestore
       const pos_doc_before = snapshot.before.data() as labor_model.positionDoc;
       const pos_doc_after = snapshot.after.data() as labor_model.positionDoc;
 
-      if (pos_doc_after === undefined) return;
+      console.log(`Position doc before: ${JSON.stringify(pos_doc_before)}`);
+      console.log(`Position doc after: ${JSON.stringify(pos_doc_after)}`);
+
+      if (pos_doc_after === undefined && pos_doc_before !== undefined && pos_doc_before.dept !== undefined && pos_doc_before.acct !== undefined) {
+        await recalcGlAccount(context_params, pos_doc_before);
+        return;
+      }
+
+      if (pos_doc_after.is_updating === true || (pos_doc_before.is_updating === true && pos_doc_after.is_updating === false)) {
+        console.log(`update in progress already.exit`);
+        return;
+      }
+
+      await snapshot.after.ref.update({ is_updating: true });
 
       // Exit function if document didn't change
       if (JSON.stringify(pos_doc_before) === JSON.stringify(pos_doc_after)) {
@@ -86,18 +101,19 @@ export const laborEntryUpdate = functions.firestore
       calculateRate(pos_doc_after);
 
       // write updated document
+      pos_doc_after.is_updating = false;
       await labor_snap.ref.collection("positions").doc(context_params.position_id).update(pos_doc_after);
 
-      // TODO VALIDATE
-      // now update the gl account => ONLY if we have values for ACCT and DEPT
-      setTimeout(async () => {
-        if (pos_doc_after.acct !== undefined && pos_doc_after.dept !== undefined) {
-          await recalcGlAccount(context_params, pos_doc_after);
-          // ... also if either ACCT/DEPT (or both) changed, then we need to recalculate the combination where the position was removed from
-          if (pos_doc_before.acct !== pos_doc_after.acct || pos_doc_before.dept !== pos_doc_after.dept)
-            await recalcGlAccount(context_params, pos_doc_before);
-        }
-      }, 1000);
+      if (pos_doc_after.acct !== undefined && pos_doc_after.dept !== undefined) {
+        await recalcGlAccount(context_params, pos_doc_after);
+        // ... also if either ACCT/DEPT (or both) changed, then we need to recalculate the combination where the position was removed from
+        // if (
+        //   (pos_doc_before.acct !== pos_doc_after.acct || pos_doc_before.dept !== pos_doc_after.dept) &&
+        //   pos_doc_before.acct !== undefined &&
+        //   pos_doc_before.dept !== undefined
+        // )
+        //   await recalcGlAccount(context_params, pos_doc_before);
+      }
     } catch (error) {
       console.log(`Error occured while processing labor update: ${error}`);
     }
@@ -136,6 +152,7 @@ function calculateWages(position: labor_model.positionDoc, days_in_months: numbe
     }
   }
   position.wages.total = utils.finRound(position.wages.total);
+  console.log(`wage calc complete`);
 }
 
 function calculateAvgFTEs(days_in_months: number[], ftes: labor_model.laborCalc) {
@@ -149,6 +166,7 @@ function calculateAvgFTEs(days_in_months: number[], ftes: labor_model.laborCalc)
   }
 
   ftes.total = utils.finRound(avg_ftes);
+  console.log(`avg fte calc complete`);
 }
 
 function calculateRate(position: labor_model.positionDoc) {
@@ -159,6 +177,7 @@ function calculateRate(position: labor_model.positionDoc) {
   } else if (position.status === "Salary" && position.rate.annual !== undefined) {
     position.rate.hourly = utils.finRound(position.rate.annual / position.fte_factor);
   }
+  console.log(`calculate Rate complete`);
 }
 
 async function recalcGlAccount(context_params: contextParams, updated_position: labor_model.positionDoc) {
@@ -169,8 +188,7 @@ async function recalcGlAccount(context_params: contextParams, updated_position: 
     .where("dept", "==", updated_position.dept)
     .get();
 
-  // create a labor flag => if no labor positions exist anymore, then this will stay false so that we flag the GL account correctly
-  let labor_calc_flag = "entry";
+  //let labor_calc_flag = "entry";
   const updated_values = utils.getValuesArray();
   for (const curr_pos_doc of pos_snap.docs) {
     const curr_wages = (curr_pos_doc.data() as labor_model.positionDoc).wages;
@@ -178,26 +196,55 @@ async function recalcGlAccount(context_params: contextParams, updated_position: 
     for (let idx = 0; idx < updated_values.length; idx++) {
       updated_values[idx] += curr_wages.values[idx];
     }
-    labor_calc_flag = "labor";
+    //  labor_calc_flag = "labor";
   }
 
   // update the account doc
-  const acct_snap = await db
-    .collection(`entities/${context_params.entity_id}/plans/${context_params.plan_id}/versions/${context_params.version_id}/dept`)
-    .where("acct", "==", updated_position.acct)
-    .where("dept", "==", updated_position.dept)
-    .get();
+  // const acct_snap = await db
+  //   .collection(`entities/${context_params.entity_id}/plans/${context_params.plan_id}/versions/${context_params.version_id}/dept`)
+  //   .where("acct", "==", updated_position.acct)
+  //   .where("dept", "==", updated_position.dept)
+  //   .get();
 
-  if (acct_snap.empty) {
-    console.log(
-      `Version ${context_params.version_id} in plan ${context_params.plan_id} of entity ${context_params.entity_id} does not have the following dept:acct combination: ${updated_position.dept}:${updated_position.acct}. Wages not updated in version.`
-    );
-    return;
-  }
+  // if (acct_snap.empty) {
+  //   console.log(
+  //     `Version ${context_params.version_id} in plan ${context_params.plan_id} of entity ${context_params.entity_id} does not have the following dept:acct combination: ${updated_position.dept}:${updated_position.acct}. Wages not updated in version.`
+  //   );
+  //   return;
+  // }
 
+  // get the dept ID from entity structure
+  const dept_doc = await db.doc(`entities/${context_params.entity_id}/entity_structure/dept`).get();
+  if (!dept_doc.exists) throw new Error(`could not find department doc for ${context_params.entity_id}`);
+  const dept_dict = dept_doc.data() as entity_model.deptDict;
+
+  // and the entity document itself
+  const entity_doc = await db.doc(`entities/${context_params.entity_id}`).get();
+  if (!entity_doc.exists) throw new Error(`could not find department doc for ${context_params.entity_id}`);
+  const entity_obj = entity_doc.data() as entity_model.entityDoc;
+
+  if (updated_position.dept === undefined || updated_position.acct === undefined) throw new Error("dept or acct not defined");
+  const div = dept_dict[updated_position.dept].div;
+
+  if (div === undefined) throw new Error("div not defined");
+
+  const full_acct = utils.buildFullAccountString([entity_obj.full_account], { acct: updated_position.acct, dept: updated_position.dept, div: div });
+
+  console.log(`full account string built: ${full_acct}`);
   // otherwise take the first account (since there should only be one) and update!
-  await acct_snap.docs[0].ref.update({
-    values: updated_values,
-    calc_type: labor_calc_flag,
-  });
+  // await acct_snap.docs[0].ref.update({
+  //   calc_type: labor_calc_flag,
+  // });
+
+  // and request a recalc
+  await version_recalc.beginVersionRollupRecalc(
+    {
+      acct_id: full_acct,
+      entity_id: context_params.entity_id,
+      plan_id: context_params.plan_id as string,
+      values: updated_values,
+      version_id: context_params.version_id,
+    },
+    false
+  );
 }
