@@ -32,6 +32,9 @@ export const driverDocCreate = functions.firestore
   .document("entities/{entityId}/drivers/{versionId}/dept/{acctId}")
   .onCreate(async (snapshot, context) => {
     try {
+      // ensure that we have a driver doc for this version & create it if we don't
+      await createVersionDriverDoc(context.params.entityId, context.params.versionId);
+
       await processDriverDocChange(snapshot, { entity_id: context.params.entityId, version_id: context.params.versionId, acct_id: context.params.acctId });
     } catch (error) {
       console.log("Error occured while updating driver doc: " + error);
@@ -62,5 +65,24 @@ async function processDriverDocChange(snapshot: admin.firestore.QueryDocumentSna
   // update the data object and also write to firestore
   acct_driver_definition.ref_accts = nlevel_ref_accts;
   await snapshot.ref.update({ ref_accts: nlevel_ref_accts });
+}
 
+async function createVersionDriverDoc(entity_id: string, version_id: string) {
+  try {
+    const driver_doc = await db.doc(`entities/${entity_id}/drivers/${version_id}`).get();
+    if (driver_doc.exists) return;
+
+    // find the correct plan_id
+    const plan_snap = await db.collection(`entities/${entity_id}/plans`).get();
+    for(const plan of plan_snap.docs) {
+      const version_doc = await plan.ref.collection(`versions`).doc(version_id).get();
+      if(version_doc.exists) {
+        await db.doc(`entities/${entity_id}/drivers/${version_id}`).set({version_id: version_id, plan_id: plan.id});
+        return;
+      }
+    }
+
+  } catch (error) {
+    console.log(`Error during [createVersionDriverDoc]: ${error}`);
+  }
 }
