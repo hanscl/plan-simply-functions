@@ -39,7 +39,6 @@ export const saveItemizedEntry = functions.https.onRequest(
           return;
         }
 
-        //console.log(`USE THIS:[${authToken}]`);
         const dec_token = await https_utils.decodeAuthToken(authToken);
 
         if(dec_token === undefined) {
@@ -59,8 +58,8 @@ export const saveItemizedEntry = functions.https.onRequest(
         console.log(
           `Running itemized entry update for entity ${recalc_request.entity_id} and version ${recalc_request.version_id} with account ${recalc_request.acct_id}. Values: ${JSON.stringify(recalc_request.values)}`
         );
-
-        await version_recalc.beginVersionRollupRecalc(recalc_request, true);
+        
+        await version_recalc.beginVersionRollupRecalc(recalc_request, true, "entry");
 
         response.status(200).send({result: `Function completed successfully.`});
       } catch (error) {

@@ -40,7 +40,7 @@ interface updateObj {
   total: number;
 }
 
-export async function executeVersionRollupRecalc(recalc_params: recalcParams, recalc_tx: FirebaseFirestore.Transaction, passed_acct_changes?: acctChanges) {
+export async function executeVersionRollupRecalc(recalc_params: recalcParams, recalc_tx: FirebaseFirestore.Transaction, caller_id: "entry" | "driver" | "labor" | "entity_rollup" = "entry", passed_acct_changes?: acctChanges) {
   try {
     // get the version, plan and account references
     const entity_ref = db.doc(`entities/${recalc_params.entity_id}`);
@@ -89,7 +89,7 @@ export async function executeVersionRollupRecalc(recalc_params: recalcParams, re
     if (acct_changes.months_changed.length === 0) return undefined;
 
     // create a copy of the account, with new values & update the params object with the dept
-    const nlevel_acct_after = { ...nlevel_acct_before, values: recalc_params.values };
+    const nlevel_acct_after = { ...nlevel_acct_before, values: recalc_params.values, calc_type: caller_id };
     nlevel_acct_after.total += acct_changes.diff_total;
     recalc_params.dept = nlevel_acct_after.dept;
 
@@ -113,7 +113,7 @@ export async function executeVersionRollupRecalc(recalc_params: recalcParams, re
     }
 
     // write the n_level account changes
-    recalc_tx.update(acct_ref, { values: nlevel_acct_after.values, total: nlevel_acct_after.total });
+    recalc_tx.update(acct_ref, { values: nlevel_acct_after.values, total: nlevel_acct_after.total, calc_type: nlevel_acct_after.calc_type });
 
     return acct_changes;
   } catch (error) {

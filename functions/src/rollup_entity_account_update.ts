@@ -81,6 +81,7 @@ export async function updateAccountInRollupEntities(recalc_params: recalcParams,
           await version_recalc.beginVersionRollupRecalc(
             { entity_id: rollup_entity_doc.id, acct_id: rollup_full_account, plan_id: rollup_plan_doc.id, version_id: rollup_version_doc.id, values: [] },
             false,
+            "entity_rollup",
             acct_changes
           );
         }

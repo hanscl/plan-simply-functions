@@ -56,7 +56,7 @@ export interface accountDoc {
   // values & calculation
   total: number;
   values: number[];
-  calc_type?: "entry" | "driver" | "labor";
+  calc_type?: "entry" | "driver" | "labor" | "entity_rollup";
   is_locked?: boolean;
 }
 

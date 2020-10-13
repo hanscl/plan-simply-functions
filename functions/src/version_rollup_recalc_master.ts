@@ -19,14 +19,21 @@ interface recalcParams {
 export async function beginVersionRollupRecalc(
   recalc_params: recalcParams,
   user_initiated: boolean,
+  caller_id: "entry" | "driver" | "labor" | "entity_rollup" = "entry",
   passed_acct_changes?: version_recalc_slave.acctChanges
 ) {
   try {
     // Begin by checking if version editing is allowed
     console.log(`calling isUpdateAllowed with user_init: ${user_initiated} and ${JSON.stringify(recalc_params)}`);
-    if (user_initiated && !(await isUpdatedAllowed(recalc_params))) {
+    const acct_list: plan_model.accountDoc[] = [];
+    if (user_initiated && !(await isUpdatedAllowed(recalc_params, acct_list))) {
       console.log(`user initiated and no updated allowed. Exit`);
       return;
+    }
+    // delete driver if needed 
+    if(caller_id === "entry" && acct_list[0].calc_type === "driver") {
+      console.log(`Removing driver definition for ${recalc_params.acct_id} - user saved itemized entries.`);
+      await db.doc(`entities/${recalc_params.entity_id}/drivers/${recalc_params.version_id}/dept/${recalc_params.acct_id}`).delete();
     }
 
     console.log(`Before Transaction: Updating acct ${recalc_params.acct_id} to ${JSON.stringify(recalc_params.values)}`);
@@ -48,7 +55,7 @@ export async function beginVersionRollupRecalc(
       }
 
       // perform recalc in here to ensure no other update runs concurrently on this version
-      const recalc_res = await version_recalc_slave.executeVersionRollupRecalc(recalc_params, recalc_tx, passed_acct_changes);
+      const recalc_res = await version_recalc_slave.executeVersionRollupRecalc(recalc_params, recalc_tx, caller_id, passed_acct_changes);
 
       recalc_tx.update(version_doc.ref, { last_update: admin.firestore.Timestamp.now() });
 
@@ -72,21 +79,24 @@ export async function beginVersionRollupRecalc(
   }
 }
 
-async function isUpdatedAllowed(recalc_params: recalcParams): Promise<boolean> {
+async function isUpdatedAllowed(recalc_params: recalcParams, acct_list: plan_model.accountDoc[]): Promise<boolean> {
   try {
     // (1) Check version lock
     const version_doc = await db.doc(`entities/${recalc_params.entity_id}/plans/${recalc_params.plan_id}/versions/${recalc_params.version_id}`).get();
     if (!version_doc.exists) throw new Error("Could not read version document. This must be a code error?");
     const version = version_doc.data() as plan_model.versionDoc;
     console.log(`update allowed check version doc: ${JSON.stringify(version)}`);
-    if (version.is_locked.all === true) return false;
-
+    
     console.log(`checking account lock`);
     // (2) Check account lock
     const acct_doc = await version_doc.ref.collection("dept").doc(recalc_params.acct_id).get();
     if (!acct_doc.exists) throw new Error("Could not read account document. This must be a code error?");
     const acct_obj = acct_doc.data() as plan_model.accountDoc;
-    if (acct_obj.is_locked === true) return false;
+    // save for calling function; TODO improve code
+    acct_list.push(acct_obj);
+
+    if (version.is_locked.all === true || acct_obj.is_locked === true) return false;
+
 
     // (3) Check period (calc differences)
     const diff_by_month: number[] = [];

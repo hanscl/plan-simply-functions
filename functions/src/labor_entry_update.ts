@@ -40,7 +40,6 @@ export const laborEntryUpdate = functions.firestore
       if (!plan_snap.exists) throw new Error(`Plan document ${context_params.plan_id} does not exists for entity ${context_params.entity_id}. Exiting.`);
       const plan_doc = plan_snap.data() as plan_model.planDoc;
 
-
       if (pos_doc_after === undefined && pos_doc_before !== undefined && pos_doc_before.dept !== undefined && pos_doc_before.acct !== undefined) {
         await recalcGlAccount(context_params, pos_doc_before);
         return;
@@ -247,6 +246,7 @@ async function recalcGlAccount(context_params: contextParams, updated_position: 
       values: updated_values,
       version_id: context_params.version_id,
     },
-    false
+    false,
+    "labor"
   );
 }
