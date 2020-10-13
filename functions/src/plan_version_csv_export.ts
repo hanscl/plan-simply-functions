@@ -195,9 +195,14 @@ async function buildReportJson(
   for (const acct_id of Object.keys(acct_dict).sort()) {
     for (const dept_id of acct_dict[acct_id].depts) {
       // console.log(`executing acct-dept combo: ${acct_id}:${dept_id}`);
-      const div_id = dept_dict[dept_id].div;
+      const dept_obj = dept_dict[dept_id];
+      if(dept_obj === undefined) {
+        console.log(`Unable to locate dept ${dept_id} in dept dictionary - at acct ${JSON.stringify(acct_id)}`);
+        continue;
+      }
+      const div_id = dept_obj.div;
       if (div_id === undefined) {
-        console.log(`Unable to locate dept ${dept_id} in dept dictionary`);
+        console.log(`Unable to locate div in dept obj ${JSON.stringify(dept_obj)} dictionary`);
         continue;
       }
       const full_account = utils.buildFullAccountString([entity.full_account], {

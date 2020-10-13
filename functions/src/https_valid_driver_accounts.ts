@@ -112,19 +112,19 @@ export const getValidDriverAccounts = functions.https.onRequest(
           console.log(JSON.stringify(view_sect));
         }
 
-        console.log(
-          `Built the new driver account JSON object: ${JSON.stringify(
-            valid_driver_accounts
-          )}`
-        );
+        // console.log(
+        //   `Built the new driver account JSON object: ${JSON.stringify(
+        //     valid_driver_accounts
+        //   )}`
+        // );
         // STEP 3: determine if accounts can be selected or not
         processDriverSections(valid_driver_accounts.sections, dep_accounts);
 
-        console.log(
-          `Updated JSON object with can_select flags: ${JSON.stringify(
-            valid_driver_accounts
-          )}`
-        );
+        // console.log(
+        //   `Updated JSON object with can_select flags: ${JSON.stringify(
+        //     valid_driver_accounts
+        //   )}`
+        // );
 
         response.json(valid_driver_accounts).status(200).send();
 

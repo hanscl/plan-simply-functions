@@ -14,8 +14,10 @@ export const driverDocUpdate = functions.firestore
       if (
         JSON.stringify((snapshot.before.data() as driver_model.acctDriverDef).ref_accts) !==
         JSON.stringify((snapshot.after.data() as driver_model.acctDriverDef).ref_accts)
-      )
+      ) {
+        console.log(`driver snapshot unchanged. exiting`);
         return;
+      }
 
       await processDriverDocChange(snapshot.after, {
         entity_id: context.params.entityId,
@@ -48,12 +50,15 @@ async function processDriverDocChange(snapshot: admin.firestore.QueryDocumentSna
   const driver_doc = await driver_doc_ref.get();
   if (!driver_doc.exists) throw new Error(`Driver document not found: ${JSON.stringify(driver_doc_ref.path)}`);
 
+  console.log(`completing context params`);
   // complete the necessary context parameters
   const driver_params: driver_model.driverParamsAll = { ...context_params, plan_id: (driver_doc.data() as driver_model.driverDoc).plan_id };
 
+  console.log(`getting driver definition`);  
   // Get the acct driver definition from the document
   const acct_driver_definition = snapshot.data() as driver_model.acctDriverDef;
 
+  console.log(`recalcing driver value`);
   /******** 1. RECALC THE DRIVER VALUE ***************/
   await driver_calc.driverCalcValue(acct_driver_definition, driver_params);
 
