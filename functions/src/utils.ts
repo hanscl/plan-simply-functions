@@ -232,3 +232,13 @@ export function getValueDiffsByMonth(vals_before: number[], vals_after: number[]
 
   return diff_total;
 }
+
+export function valuesNullConversion(values: number[]) {
+  const ret_values: number[] = [];
+  for(let i = 0; i < values.length; i++) {
+    if(values[i] === null || values[i] === undefined) ret_values.push(0);
+    else ret_values.push(values[i]);
+  }
+
+  return ret_values;
+}
