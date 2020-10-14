@@ -43,11 +43,11 @@ async function processDriverCombination(
 ) {
   let second_operand: number[] = [];
   if (next_driver.type === "acct") second_operand = await getAccountValue(driver_tx, next_driver, driver_params);
-  else second_operand = utils.valuesNullConversion(next_driver.entry as number[]);
+  else second_operand = next_driver.entry as number[];
 
   const driver_result: number[] = utils.getValuesArray();
 
-  for (let idx = 0; idx < first_operand.length; idx++) {
+  for (let idx = 0; idx < first_operand.length; idx++) {  
     driver_result[idx] = utils.finRound(performDriverCalc([first_operand[idx], second_operand[idx]], operation));
   }
 

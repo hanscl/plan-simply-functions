@@ -3,6 +3,8 @@ import * as admin from "firebase-admin";
 import * as driver_model from "./driver_model";
 import * as driver_dependencies from "./driver_dependencies";
 import * as driver_calc from "./driver_calc";
+import * as utils from "./utils";
+import { QueryDocumentSnapshot } from "firebase-functions/lib/providers/firestore";
 
 const db = admin.firestore();
 
@@ -19,6 +21,12 @@ export const driverDocUpdate = functions.firestore
         return;
       }
 
+      if(await driverDocNullCheck(snapshot.after)) {
+        console.log(`drivers were updated. exit function -- this will be called again`);
+        return;
+      }
+
+      console.log(`no nulls found. proceeding with processing drivers`);
       await processDriverDocChange(snapshot.after, {
         entity_id: context.params.entityId,
         version_id: context.params.versionId,
@@ -37,6 +45,13 @@ export const driverDocCreate = functions.firestore
       // ensure that we have a driver doc for this version & create it if we don't
       await createVersionDriverDoc(context.params.entityId, context.params.versionId);
 
+      if(await driverDocNullCheck(snapshot)) {
+        console.log(`drivers were updated. exit function -- this will be called again`);
+        return;
+      }
+
+      console.log(`no nulls found. proceeding with processing drivers`);
+
       await processDriverDocChange(snapshot, { entity_id: context.params.entityId, version_id: context.params.versionId, acct_id: context.params.acctId });
     } catch (error) {
       console.log("Error occured while updating driver doc: " + error);
@@ -54,7 +69,7 @@ async function processDriverDocChange(snapshot: admin.firestore.QueryDocumentSna
   // complete the necessary context parameters
   const driver_params: driver_model.driverParamsAll = { ...context_params, plan_id: (driver_doc.data() as driver_model.driverDoc).plan_id };
 
-  console.log(`getting driver definition`);  
+  console.log(`getting driver definition`);
   // Get the acct driver definition from the document
   const acct_driver_definition = snapshot.data() as driver_model.acctDriverDef;
 
@@ -79,14 +94,13 @@ async function createVersionDriverDoc(entity_id: string, version_id: string) {
 
     // find the correct plan_id
     const plan_snap = await db.collection(`entities/${entity_id}/plans`).get();
-    for(const plan of plan_snap.docs) {
+    for (const plan of plan_snap.docs) {
       const version_doc = await plan.ref.collection(`versions`).doc(version_id).get();
-      if(version_doc.exists) {
-        await db.doc(`entities/${entity_id}/drivers/${version_id}`).set({version_id: version_id, plan_id: plan.id});
+      if (version_doc.exists) {
+        await db.doc(`entities/${entity_id}/drivers/${version_id}`).set({ version_id: version_id, plan_id: plan.id });
         return;
       }
     }
-
   } catch (error) {
     console.log(`Error during [createVersionDriverDoc]: ${error}`);
   }
@@ -98,4 +112,22 @@ export async function deleteDriverDefinition(entity_id: string, plan_id: string,
   } catch (error) {
     console.log(`Error occured during [deleteDriverDefinition]: ${error}`);
   }
+}
+
+async function driverDocNullCheck(snapshot_after: QueryDocumentSnapshot): Promise<boolean> {
+  const driver_def = snapshot_after.data() as driver_model.acctDriverDef;
+  console.log(`driver_before: ${JSON.stringify(driver_def)}`);
+  let rewrite_req: boolean = false;
+  for (const driver_entry of driver_def.drivers) {
+    if (driver_entry.type === "value") {
+      if (utils.valuesNullConversion(driver_entry.entry as number[]) === true) rewrite_req = true;
+    }
+    console.log(`driver_after: ${JSON.stringify(driver_def)}`);
+
+    if (rewrite_req === true) {
+      console.log(`updating driver doc`);
+      await snapshot_after.ref.update(driver_def);
+    }
+  }
+  return rewrite_req;
 }

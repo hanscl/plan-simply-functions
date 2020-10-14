@@ -234,15 +234,15 @@ export function getValueDiffsByMonth(vals_before: number[], vals_after: number[]
 }
 
 export function valuesNullConversion(values: number[]) {
-  const ret_values: number[] = [];
+  let found_null = false;
   console.log(`utils called for valuesNullConversion with ${JSON.stringify(values)}`);
-  for(let i = 0; i < values.length; i++) {
-    if(!values[i] || values[i] === undefined) {
-      ret_values.push(0);
+  for (let i = 0; i < values.length; i++) {
+    if ((!values[i] && values[i] !== 0) || values[i] === undefined || values[i] === null) {
+      values[i] = 0;
+      found_null = true;
     }
-    else ret_values.push(values[i]);
   }
 
-  console.log(`clean array before return: ${JSON.stringify(ret_values)}`);
-  return ret_values;
+  console.log(`clean array before return: ${JSON.stringify(values)}`);
+  return found_null;
 }
