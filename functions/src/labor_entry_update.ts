@@ -45,12 +45,12 @@ export const laborEntryUpdate = functions.firestore
         return;
       }
 
-      if (pos_doc_after.is_updating === true || (pos_doc_before.is_updating === true && pos_doc_after.is_updating === false)) {
-        console.log(`update in progress already.exit`);
-        return;
-      }
+      // if (pos_doc_after.is_updating === true || (pos_doc_before.is_updating === true && pos_doc_after.is_updating === false)) {
+      //   console.log(`update in progress already.exit`);
+      //   return;
+      // }
 
-      await snapshot.after.ref.update({ is_updating: true });
+      // await snapshot.after.ref.update({ is_updating: true });
 
       // Exit function if document didn't change
       if (JSON.stringify(pos_doc_before) === JSON.stringify(pos_doc_after)) {
@@ -101,7 +101,7 @@ export const laborEntryUpdate = functions.firestore
       calculateRate(pos_doc_after);
 
       // write updated document
-      pos_doc_after.is_updating = false;
+     // pos_doc_after.is_updating = false;
       await labor_snap.ref.collection("positions").doc(context_params.position_id).update(pos_doc_after);
 
       if (pos_doc_after.acct !== undefined && pos_doc_after.dept !== undefined) {
