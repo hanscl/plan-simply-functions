@@ -96,12 +96,16 @@ export const laborEntryUpdate = functions.firestore
       const days_in_months = utils.getDaysInMonth(plan_doc.begin_year, plan_doc.begin_month);
       console.log(`Days in plan months are: ${JSON.stringify(days_in_months)}`);
 
-      calculateWages(pos_doc_after, days_in_months);
+      const entity_doc = await db.doc(`entities/${context_params.entity_id}`).get();
+      if (!entity_doc.exists) throw new Error(`no entity doc found for [entities/${context_params.entity_id}]`);
+      const wage_method = (entity_doc.data() as entity_model.entityDoc).labor_calcs.wage_method;
+      if (wage_method === "us") calculateWagesUS(pos_doc_after, days_in_months);
+      else calculateWagesEU(pos_doc_after);
       calculateAvgFTEs(days_in_months, pos_doc_after.ftes);
       calculateRate(pos_doc_after);
 
       // write updated document
-     // pos_doc_after.is_updating = false;
+      // pos_doc_after.is_updating = false;
       await labor_snap.ref.collection("positions").doc(context_params.position_id).update(pos_doc_after);
 
       if (pos_doc_after.acct !== undefined && pos_doc_after.dept !== undefined) {
@@ -119,7 +123,41 @@ export const laborEntryUpdate = functions.firestore
     }
   });
 
-function calculateWages(position: labor_model.positionDoc, days_in_months: number[]) {
+function calculateWagesEU(position: labor_model.positionDoc) {
+  if (position.wages === undefined) {
+    position.wages = { total: 0, values: utils.getValuesArray() };
+  }
+  if (position.ftes === undefined) {
+    console.log(`trying to calculate wages without FTEs`);
+    return;
+  }
+  if (position.rate === undefined) {
+    console.log(`trying to calculate wages without a rate`);
+    return;
+  }
+  if (position.status === "Hourly" && position.fte_factor === undefined) {
+    console.log(`trying to calculate hourly wages without an FTE factor `);
+    return;
+  }
+
+  position.wages.total = 0;
+  for (let mnth_idx = 0; mnth_idx < 12; mnth_idx++) {
+    if (position.status === "Salary" && position.rate.annual !== undefined) {
+      position.wages.values[mnth_idx] = position.ftes.values[mnth_idx] * (position.rate.annual / 12);
+      position.wages.total += position.wages.values[mnth_idx];
+      position.wages.values[mnth_idx] = utils.finRound(position.wages.values[mnth_idx]);
+      100;
+    } else if (position.status === "Hourly" && position.fte_factor !== undefined && position.rate.hourly !== undefined) {
+      position.wages.values[mnth_idx] = (position.fte_factor * position.rate.hourly) / 12 * position.ftes.values[mnth_idx];
+      position.wages.total += position.wages.values[mnth_idx];
+      position.wages.values[mnth_idx] = utils.finRound(position.wages.values[mnth_idx]);
+    }
+  }
+  position.wages.total = utils.finRound(position.wages.total);
+  console.log(`wage calc complete`);
+}
+
+function calculateWagesUS(position: labor_model.positionDoc, days_in_months: number[]) {
   if (position.wages === undefined) {
     position.wages = { total: 0, values: utils.getValuesArray() };
   }
