@@ -14,13 +14,18 @@ const firestoreClient = google.firestore({
   auth: authClient,
 });
 
-exports.backupFirestore = functions.pubsub
-  .schedule("0 21 * * *")
+export const backupFirestore = functions.pubsub
+  .schedule("0 22 * * *")
   .timeZone("America/Los_Angeles")
   .onRun(async (context) => {
     const projectId = process.env.GCP_PROJECT;
 
-    if (projectId !== "generator-zerobase") return;
+    if (projectId !== "generator-zerobase") {
+      console.log(`Project ID does not match. No backup will be performed`);
+      return;
+    } 
+    else
+      console.log(`Performing full database backup for ${projectId}.`);
 
     const timestamp = new Date().toISOString();
 

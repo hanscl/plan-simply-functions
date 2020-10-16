@@ -1,4 +1,4 @@
-exports.backup = require("./firestore_backup");
+export { backupFirestore } from "./firestore_backup";
 
 // Security
 export { writeUserAccount } from "./custom_claims";
