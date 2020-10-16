@@ -133,6 +133,7 @@ async function processRollupEntity(
       version_name: rollup_report.version_name,
       status: "processing",
       type: rollup_report.type,
+      user_id: rollup_report.user_id,
     };
 
     // save to firestore
@@ -181,7 +182,7 @@ async function buildReportJson(
   }
 
   // all accounts in version
-  console.log(`all accounts in versio: ${JSON.stringify(version_accts)}`);
+  console.log(`all accounts in version: ${JSON.stringify(version_accts)}`);
 
   // load the dept dict as well
   const dept_snap = await entity_snap.ref
