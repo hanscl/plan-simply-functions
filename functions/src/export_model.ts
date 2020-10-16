@@ -3,6 +3,7 @@ import * as admin from "firebase-admin";
 export interface reportDoc {
     created_at: admin.firestore.Timestamp;
     output: "csv" | "xls" | "pdf";
+    path: { entity: string; div?: string; dept?: string };
     plan_id: string;
     plan_name: string;
     version_id: string;
