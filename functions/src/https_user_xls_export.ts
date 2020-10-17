@@ -6,7 +6,9 @@ import * as fs from "fs-extra";
 import * as path from "path";
 import * as os from "os";
 import * as user_model from "./user_model";
+import * as nodemailer from "nodemailer";
 const cors = require("cors")({ origin: true });
+const key = require("../alert-condition-291223-fe5b366c5ed9.json");
 
 const db = admin.firestore();
 
@@ -58,6 +60,7 @@ export const processXlsExportRequest = functions.https.onRequest(
         const email = (user_snap.data() as user_model.userDoc).email
 
         console.log(`Emailing XLS reports to ${email} -- ${JSON.stringify(xls_request)}`);
+        await emailReport(email, temp_file_path);
 
         // createPlanXls();
         // createLaborXls();
@@ -71,5 +74,49 @@ export const processXlsExportRequest = functions.https.onRequest(
     });
   }
 );
+
+async function emailReport(user_email: string, file_path:string) {
+  const support_send_email = "noreply@zerobaseapp.com";
+  const mailOptions = {
+    //from: "ZeroBase Support <noreply@zerobaseapp.com>",
+    from: support_send_email,
+    to: user_email,
+    subject: "ZeroBase Excel Report", // email subject
+    html: `Hello,<br><br>Attached please find the report you requested<br><br>
+    Your ZeroBase Support team`, // email content in HTML
+    attachments: [
+      {   // file on disk as an attachment
+        filename: 'report.csv',
+        path: file_path // stream this file
+    }]
+  };
+
+
+  const transporter = nodemailer.createTransport({
+    host: "smtp.gmail.com",
+    port: 465,
+    secure: true,
+    auth: {
+      type: "OAuth2",
+      user: support_send_email,
+      serviceClient: key.client_id,
+      privateKey: key.private_key,
+    },
+  });
+
+  await transporter.verify();
+  transporter.sendMail(mailOptions, (error, info) => {
+    if (error) {
+      console.log(
+        `Error occured sending mail: ${JSON.stringify(error)}`
+      );
+      // return res.send(`Unknown error. Please contact support`);
+    } else {
+      // return res.send(
+      //   `Request submitted. Link will be sent if a user with email address ${user_email} exists.`
+      // );
+    }
+  });
+}
 
 
