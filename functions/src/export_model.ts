@@ -3,13 +3,15 @@ import * as admin from "firebase-admin";
 export interface reportDoc {
     created_at: admin.firestore.Timestamp;
     output: "csv" | "xls" | "pdf";
-    path: { entity: string; div?: string; dept?: string };
+    div?: string;
+    dept?: string;
     plan_id: string;
-    plan_name: string;
+    plan_name?: string;
     version_id: string;
-    version_name: string;
+    version_name?: string;
     status: "processing" | "complete" | "error";
-    type: "accounts" | "pnl";
+    type: "accounts" | "pnl" | "labor";
+    user_id: string;
 }
 
 export interface acctExportCsv {
