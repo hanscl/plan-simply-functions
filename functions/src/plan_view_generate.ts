@@ -74,14 +74,6 @@ export const planViewGenerate = functions.firestore
         await view_doc.ref.delete();
       });
 
-      // delete the pnl collection with the view aggregations
-      // await utils.deleteCollection(
-      //   db.collection(
-      //     `entities/${context_params.entityId}/plans/${context_params.planId}/versions/${context_params.versionId}/pnl`
-      //   ),
-      //   300
-      // );
-
       // Get the plan document to transfer total and period defs
       const plan_snapshot = await db.doc(`entities/${context_params.entityId}/plans/${context_params.planId}`).get();
 
