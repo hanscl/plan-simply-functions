@@ -67,7 +67,7 @@ export async function driverDependencyBuild(
         const pnl_doc = await plan_doc_snap.ref.collection("versions").doc(driver_params.version_id).collection("pnl").doc(drv_entry.id).get();
         if (!pnl_doc.exists) {
           console.log(`Unable to resolve PNL document from driver`);
-          return;
+          continue;
         }
         const pnl_obj = pnl_doc.data() as view_model.pnlAggregateDoc;
         console.log(`P&L Object: ${JSON.stringify(pnl_obj)}`);
@@ -89,6 +89,11 @@ export async function driverDependencyBuild(
 
 /***** HELPER FUNCTION TO CHECK IF ACCOUNT IS A ROLLUP */
 function acctIsRollup(driver_account: string, entity: entity_model.entityDoc, rollups: entity_model.rollupObj[]): boolean {
+  if (driver_account.search(".") < 0) {
+    console.log(`invalid account`);
+    return false;
+  }
+  console.log(`calling UTILS.exctratComp with ${JSON.stringify(driver_account)} & ${entity.full_account} ${entity.div_account}`);
   const acct = utils.extractAcctFromFullAccount(driver_account, [entity.full_account, entity.div_account], "acct");
 
   const rollup_idx = rollups.findIndex((rollup_obj) => {
@@ -113,6 +118,7 @@ function getRollupChildren(
   // Extract the acct elements
   const acct_format_strings = [entity.full_account];
   if (entity.div_account !== undefined) acct_format_strings.push(entity.div_account);
+  console.log(`calling UTILS.exctratComp with ${JSON.stringify(driver_account)} & ${acct_format_strings}`);
   const acct_components = utils.extractComponentsFromFullAccountString(driver_account, acct_format_strings);
 
   // make sure we have dept and acct ids
@@ -234,9 +240,35 @@ async function getDriverAccounts(acct: string, driver_params: driver_model.drive
 
   // filter down to acct_types
   const ret_acct_list: string[] = [];
-  for (const drv_entry of driver_list) {
-    if (drv_entry.type === "acct") ret_acct_list.push((drv_entry.entry as driver_model.driverAcct).id);
+
+  // remove static driver values from list so we only have accounts
+  const driver_accts: driver_model.driverEntry[] = driver_list.filter((driver_entry) => {
+    return driver_entry.type === "acct";
+  });
+
+  // for (const drv_entry of driver_list) {
+  //   if (drv_entry.type === "acct") ret_acct_list.push((drv_entry.entry as driver_model.driverAcct).id);
+  // }
+
+  for (const drv_acct of driver_accts) {
+    const drv_entry = drv_acct.entry as driver_model.driverAcct;
+    // resolve pnl entries to its children first and push the children instead of the id
+    if (drv_entry.level === "pnl") {
+      const pnl_doc = await db
+        .doc(`entities/${driver_params.entity_id}/plans/${driver_params.plan_id}/versions/${driver_params.version_id}/pnl/${drv_entry.id}`)
+        .get();
+      if (!pnl_doc.exists) {
+        console.log(`Unable to resolve PNL document from driver`);
+        continue;
+      }
+      const pnl_obj = pnl_doc.data() as view_model.pnlAggregateDoc;
+      console.log(`P&L Object: ${JSON.stringify(pnl_obj)}`);
+      for (const child_acct of pnl_obj.child_accts) {
+        ret_acct_list.push(child_acct);
+      }
+    } else ret_acct_list.push(drv_entry.id);
   }
 
+  console.log(`returning account list from driver accts call -- ${acct} - ${JSON.stringify(driver_params)} - ${ret_acct_list}`);
   return ret_acct_list;
 }
