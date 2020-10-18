@@ -1,5 +1,5 @@
 import * as functions from "firebase-functions";
-import * as key from "../generator-zerobase-d888b3abeba3.json";
+const key = require("../generator-zerobase-d888b3abeba3.json");
 
 import { google } from "googleapis";
 
@@ -15,19 +15,24 @@ const firestoreClient = google.firestore({
 });
 
 export const backupFirestore = functions.pubsub
-  .schedule("0 22 * * *")
+  .schedule("55 17 * * *")
   .timeZone("America/Los_Angeles")
   .onRun(async (context) => {
-    const projectId = process.env.GCP_PROJECT;
+    //    const projectId = process.env.GCP_PROJECT;
+    const fb_config = process.env.FIREBASE_CONFIG;
+    if (fb_config === undefined) {
+      console.log(`FIREBASE_CONFIG is undefined`);
+      return;
+    }
+    const projectId = JSON.parse(fb_config).projectId;
 
-    if (projectId !== "generator-zerobase") {
+    console.log(projectId);
+    if (projectId?.toLowerCase() !== "generator-zerobase") {
       console.log(`Project ID does not match. No backup will be performed`);
       return;
-    } 
-    else
-      console.log(`Performing full database backup for ${projectId}.`);
+    } else console.log(`Performing full database backup for ${projectId}.`);
 
-    const timestamp = new Date().toISOString();
+   // const timestamp = new Date().toISOString();
 
     console.log(`Start to backup project ${projectId}`);
 
@@ -35,7 +40,7 @@ export const backupFirestore = functions.pubsub
     return firestoreClient.projects.databases.exportDocuments({
       name: `projects/${projectId}/databases/(default)`,
       requestBody: {
-        outputUriPrefix: `gs://${projectId}-firestore-backups/backups/${timestamp}`,
+        outputUriPrefix: `gs://${projectId}-firestore-backups/backups`,
       },
     });
   });
