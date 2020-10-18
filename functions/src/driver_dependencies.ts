@@ -89,11 +89,7 @@ export async function driverDependencyBuild(
 
 /***** HELPER FUNCTION TO CHECK IF ACCOUNT IS A ROLLUP */
 function acctIsRollup(driver_account: string, entity: entity_model.entityDoc, rollups: entity_model.rollupObj[]): boolean {
-  if (driver_account.search(".") < 0) {
-    console.log(`invalid account`);
-    return false;
-  }
-  console.log(`calling UTILS.exctratComp with ${JSON.stringify(driver_account)} & ${entity.full_account} ${entity.div_account}`);
+  // console.log(`calling UTILS.exctratComp with ${JSON.stringify(driver_account)} & ${entity.full_account} ${entity.div_account}`);
   const acct = utils.extractAcctFromFullAccount(driver_account, [entity.full_account, entity.div_account], "acct");
 
   const rollup_idx = rollups.findIndex((rollup_obj) => {
@@ -118,7 +114,7 @@ function getRollupChildren(
   // Extract the acct elements
   const acct_format_strings = [entity.full_account];
   if (entity.div_account !== undefined) acct_format_strings.push(entity.div_account);
-  console.log(`calling UTILS.exctratComp with ${JSON.stringify(driver_account)} & ${acct_format_strings}`);
+  // console.log(`calling UTILS.exctratComp with ${JSON.stringify(driver_account)} & ${acct_format_strings}`);
   const acct_components = utils.extractComponentsFromFullAccountString(driver_account, acct_format_strings);
 
   // make sure we have dept and acct ids
@@ -258,11 +254,11 @@ async function getDriverAccounts(acct: string, driver_params: driver_model.drive
         .doc(`entities/${driver_params.entity_id}/plans/${driver_params.plan_id}/versions/${driver_params.version_id}/pnl/${drv_entry.id}`)
         .get();
       if (!pnl_doc.exists) {
-        console.log(`Unable to resolve PNL document from driver`);
+        // console.log(`Unable to resolve PNL document from driver`);
         continue;
       }
       const pnl_obj = pnl_doc.data() as view_model.pnlAggregateDoc;
-      console.log(`P&L Object: ${JSON.stringify(pnl_obj)}`);
+      // console.log(`P&L Object: ${JSON.stringify(pnl_obj)}`);
       for (const child_acct of pnl_obj.child_accts) {
         ret_acct_list.push(child_acct);
       }
