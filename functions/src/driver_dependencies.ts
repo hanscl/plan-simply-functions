@@ -1,6 +1,7 @@
 import * as admin from "firebase-admin";
 import * as driver_model from "./driver_model";
 import * as entity_model from "./entity_model";
+import * as view_model from "./view_model";
 import * as utils from "./utils";
 
 const db = admin.firestore();
@@ -59,9 +60,24 @@ export async function driverDependencyBuild(
     });
 
     const acct_list: string[] = [];
-    driver_accts.forEach((drv_acct) => {
-      acct_list.push((drv_acct.entry as driver_model.driverAcct).id);
-    });
+    for (const drv_acct of driver_accts) {
+      const drv_entry = drv_acct.entry as driver_model.driverAcct;
+      // resolve pnl entries to its children first and push the children instead of the id
+      if (drv_entry.level === "pnl") {
+        const pnl_doc = await plan_doc_snap.ref.collection("versions").doc(driver_params.version_id).collection("pnl").doc(drv_entry.id).get();
+        if (!pnl_doc.exists) {
+          console.log(`Unable to resolve PNL document from driver`);
+          return;
+        }
+        const pnl_obj = pnl_doc.data() as view_model.pnlAggregateDoc;
+        console.log(`P&L Object: ${JSON.stringify(pnl_obj)}`);
+        for (const child_acct of pnl_obj.child_accts) {
+          acct_list.push(child_acct);
+        }
+      } else acct_list.push(drv_entry.id);
+    }
+
+    console.log(`acct_list: ${JSON.stringify(acct_list)}`);
 
     // Recursive function to resolve all rollups
     return await resolveRollups(acct_list, entity, rollups, div_dict, acct_dict, groups, driver_params, all_driver_accts);

@@ -244,7 +244,7 @@ async function updatePnlAggregates(
   for (const pnl_doc of pnl_agg_snap.docs) {
     const pnl_obj = pnl_doc.data() as view_model.pnlAggregateDoc;
 
-    // calculate the values
+    // calculate the values 
     calcAccountValues(acct_changes, pnl_obj, pnl_obj.child_ops[pnl_obj.child_accts.indexOf(div_account_id)]);
 
     // add to batch and increase counter
