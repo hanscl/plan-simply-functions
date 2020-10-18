@@ -1,3 +1,5 @@
+export { backupFirestore } from "./firestore_backup";
+
 // Security
 export { writeUserAccount } from "./custom_claims";
 
@@ -35,4 +37,3 @@ export { sendPasswordResetLink } from "./https_password_reset_email";
 // Labor
 export { laborEntryUpdate } from "./labor_entry_update";
 export { laborRemoveAccount } from "./labor_remove_account";
-

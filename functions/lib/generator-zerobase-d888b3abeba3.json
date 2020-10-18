@@ -1,0 +1,12 @@
+{
+    "type": "service_account",
+    "project_id": "generator-zerobase",
+    "private_key_id": "d888b3abeba383996104e5904c9ddcb59787be2f",
+    "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDSJBXkBDVZ8PnJ\nffXzyVbXYya/DfcgL1fdz8AtJM9nc/hFy1gIQmkcsaNxDQBVjhpDsrk+EtBktWDR\npubg6djcLqxDNromabovKNO11FJ3uZko0LthFie/kvFHX9/jH+T4dX+JF6DU3IFZ\nhKk/IQkzX0vODElUPArX5LvKcH9W+uccL7wFFprWGdBvWDFDI0iXNmOb0RYAvb1V\n+sQkP6AJTICVbfYi3MZW/3MOUrin40qgOZVCUmggYGFqKj7qhLMHGCKOX8PzgSVG\nnLDqrmaiK1sbi5OUl4Vbo/YI3jwhclnb7qTDHnre2e8ArB24WER+hgVlnM/pTDtQ\nbSAl/RFjAgMBAAECggEAWlzNEwNiQ75VUzk4ia/zCWSoFTD2qx7gnE/JNkBldXmP\nccfKn6abF40lmKf8FE4qaiEQ+inR9fRu4UhxcJbuO2RQjAidDIabWssmGsLmAXjM\nbRow8UM7LWyNF2GZX0voRJUWFggUj2QQtUNQGgblM3OPn9d1suSszwCbZiZxA5/R\nzHpcDhnpdImyH3eRqG57EgFdK/Lfl9oAegeGmelFGqD4bmdJOkEbjbBW8MkGbZNi\nq1PZgx9hqwu3g+O6id6SfT+Mej9qu/idrEzVKZ4UocpLDOrk2DGkUed1HVPQ5rIg\n+GJQsmtqaiXReGthxWSX6OBtamJOHKWJLst3IoMKBQKBgQD4kkvBffj6HkmCdx85\nHJYGbI7as19hVx2FrHx0K1UBxHajBKSpo/ecITD0QMJUQscdxvKypyp6e62C1mHS\ne/K6JpHBhT9R2IitDShUOyCF/R5dpge16Tm4OYK0E1ULmrpLIzBFcnTN0YVBFdid\npMzLpo6VAAlDHuSMjDW+ejFrxwKBgQDYa8aWTf76W+/f3H3xXD3JjLwUxWXVI+sA\nt6aYFgXPnAJTknOFrvgUV6U4mv5tz0DhnQN+HWhRQRuMTYHPWK5t02TI0mflWH0V\n0rN8pxhGLW8ERSXioOI1jHNlD8HmEuqMnJ34FADoBk+w8dOjrbEmTWfYlSSAwmVp\nyfJs/EFVhQKBgQC8oxFYksgK0EdK+im4xsfXsjSrJerhTSI7Wo3L/0Jwp+68gf6Q\nOr3jP5EOG8Md/Nts7pkqGRB0iT1BCH6OJMAsoq6EZSGLdD8szMppOcHRzShpO2Go\nnIjQFNzq2az1tINiGB8+5MBdnX55ySFtaS598jVMQA3HYT9ipdj3Z3Xv6wKBgDS2\n07EqoE+k8yGI2Fhgyl/8WpeImUw4KnaLRRXIT3QJIPvwMRk/zAdQbdsCzbQ7hicu\nEnq2eQFJpYcgHd0+UYZItkTAEzRmwFj/cF6NaLk3OdJFcXvpChBW/IiCNQ1wUBcd\n0tBpNutNFj4YOR+mH/8fXYsAkNqX/xGscdMgAl3tAoGBAJQY9Gnwje2KvEO8ODCr\ncboRyyet/k8tPQPk2lStTBBZKo+Y7QomIZwbOGLturDWozMHoO10cKGmhj8kwmgT\nz7iAWcmZ1JUG59jkcDgpoY4RA3PEmHfTHey9XsYKVCFu12PuyP82M4OG42Yy0Nng\nJKxFfBDkYCZgWmkmnHF2ceqn\n-----END PRIVATE KEY-----\n",
+    "client_email": "firestore-generator-backup@generator-zerobase.iam.gserviceaccount.com",
+    "client_id": "114317006052567277181",
+    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+    "token_uri": "https://oauth2.googleapis.com/token",
+    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+    "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firestore-generator-backup%40generator-zerobase.iam.gserviceaccount.com"
+}
