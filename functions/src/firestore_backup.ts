@@ -15,7 +15,7 @@ const firestoreClient = google.firestore({
 });
 
 export const backupFirestore = functions.pubsub
-  .schedule("55 17 * * *")
+  .schedule("0 21 * * *")
   .timeZone("America/Los_Angeles")
   .onRun(async (context) => {
     //    const projectId = process.env.GCP_PROJECT;
@@ -32,7 +32,7 @@ export const backupFirestore = functions.pubsub
       return;
     } else console.log(`Performing full database backup for ${projectId}.`);
 
-   // const timestamp = new Date().toISOString();
+    const timestamp = new Date().toISOString();
 
     console.log(`Start to backup project ${projectId}`);
 
@@ -40,7 +40,7 @@ export const backupFirestore = functions.pubsub
     return firestoreClient.projects.databases.exportDocuments({
       name: `projects/${projectId}/databases/(default)`,
       requestBody: {
-        outputUriPrefix: `gs://${projectId}-firestore-backups/backups`,
+        outputUriPrefix: `gs://${projectId}-firestore-backup/backups/${timestamp}`,
       },
     });
   });
