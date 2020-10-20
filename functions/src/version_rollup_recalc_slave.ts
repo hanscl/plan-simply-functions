@@ -12,6 +12,7 @@ interface recalcParams {
   acct_id: string;
   values: number[];
   dept?: string;
+  comments?: string;
 }
 
 interface docRefs {
@@ -86,7 +87,13 @@ export async function executeVersionRollupRecalc(recalc_params: recalcParams, re
     console.log(`utils calculated differences: ${JSON.stringify(acct_changes)}`);
 
     // if there is no change across all 12 months, exit => this is important to avoid endless update triggers!!
-    if (acct_changes.months_changed.length === 0) return undefined;
+    if (acct_changes.months_changed.length === 0) {
+      // save comments if they changed
+      if(recalc_params.comments !== undefined && recalc_params.comments !== nlevel_acct_before.comments) {
+        await recalc_tx.update(acct_ref,  { comments: recalc_params.comments});
+      }
+      return undefined;
+    }
 
     // create a copy of the account, with new values & update the params object with the dept
     const nlevel_acct_after = { ...nlevel_acct_before, values: recalc_params.values, calc_type: caller_id };
@@ -113,7 +120,14 @@ export async function executeVersionRollupRecalc(recalc_params: recalcParams, re
     }
 
     // write the n_level account changes
-    recalc_tx.update(acct_ref, { values: nlevel_acct_after.values, total: nlevel_acct_after.total, calc_type: nlevel_acct_after.calc_type });
+    let nlevel_update = undefined;
+    if(recalc_params.comments !== undefined) { // TODO: more efficient code
+      nlevel_update = { values: nlevel_acct_after.values, total: nlevel_acct_after.total, calc_type: nlevel_acct_after.calc_type , comments: recalc_params.comments };
+    }
+    else {
+      nlevel_update = { values: nlevel_acct_after.values, total: nlevel_acct_after.total, calc_type: nlevel_acct_after.calc_type };
+    }
+    recalc_tx.update(acct_ref,  nlevel_update);
 
     return acct_changes;
   } catch (error) {

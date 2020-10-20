@@ -24,7 +24,7 @@ export interface acctDriverDef {
   drivers: driverEntry[];
   operations: ("add" | "sub" | "mlt" | "dvs" | "pct")[];
   ref_accts?: string[]; 
-  comment?: string;
+  comments?: string;
 }
 
 export interface driverDoc {

@@ -27,7 +27,7 @@ export async function driverCalcValue(driver_def: driver_model.acctDriverDef, dr
 
       console.log(`calling beginVersionROllupCalc with: ${JSON.stringify({ ...driver_params, values: last_result })}`);
 
-      await version_recalc.beginVersionRollupRecalc({ ...driver_params, values: last_result }, false, "driver");
+      await version_recalc.beginVersionRollupRecalc({ ...driver_params, values: last_result, comments: driver_def.comments }, false, "driver");
  //   });
   } catch (e) {
     console.log("Transaction failure:", e);

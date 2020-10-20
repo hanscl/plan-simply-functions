@@ -60,11 +60,11 @@ export const saveItemizedEntry = functions.https.onRequest(async (request, respo
       );
 
       let user_req = true;
-      if (dec_token === "5f7vMkqH6ffINY7RoPomdDVrhnE2") user_req = false;
+      if (dec_token === "5f7vMkqH6ffINY7RoPomdDVrhnE2" || dec_token === "Cf4y9PEkLMUo8maMMmJHj1BhaA73") user_req = false;
 
       await version_recalc.beginVersionRollupRecalc(recalc_request, user_req, "entry");
 
-      response.status(200).send({ result: `Function completed successfully.` });
+      response.status(200).send({ result: `Itemized Entry Function completed successfully.` });
     } catch (error) {
       console.log(`Error occured during itemized entry update: ${error}`);
       response.sendStatus(500);

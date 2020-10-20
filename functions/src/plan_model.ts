@@ -58,6 +58,7 @@ export interface accountDoc {
   values: number[];
   calc_type?: "entry" | "driver" | "labor" | "entity_rollup";
   is_locked?: boolean;
+  comments?: string;
 }
 
 interface parentRollup {

@@ -14,6 +14,7 @@ interface recalcParams {
   acct_id: string;
   values: number[];
   dept?: string;
+  comments?: string;
 }
 
 export async function beginVersionRollupRecalc(
