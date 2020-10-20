@@ -19,7 +19,7 @@ export interface laborValidationResponse {
 
 interface laborValidAcctsByDept {
   dept_id: string;
-  acct_ids: string[];
+  acct_id: string;
 }
 
 export const getLaborValidations = functions.https.onRequest(async (request, response) => {
@@ -98,17 +98,20 @@ export const getLaborValidations = functions.https.onRequest(async (request, res
           .where("parent_rollup.acct", "==", "EXP_WGE")
           .get();
 
-        const acct_list: string[] = [];
         for (const valid_acct of acct_snap.docs) {
-          acct_list.push((valid_acct.data() as accountDoc).acct);
+          accts_by_dept.push({ dept_id: valid_dept, acct_id: (valid_acct.data() as accountDoc).acct });
         }
-        accts_by_dept.push({ dept_id: valid_dept, acct_ids: acct_list });
       }
 
-      // console.log & return
-      console.log(`Completed building valid accounts response: ${JSON.stringify(accts_by_dept)}`);
+      const labor_response: laborValidationResponse = {
+        valid_depts: dept_list,
+        valid_accts: accts_by_dept,
+      };
 
-      response.json(accts_by_dept).status(200).send();
+      // console.log & return
+      console.log(`Completed building valid accounts response2: ${JSON.stringify(labor_response)}`);
+
+      response.json(labor_response).status(200).send();
       //response.status(200).send({ result: `Function completed successfully.` });
     } catch (error) {
       console.log(`Error occured during labor validation request: ${error}`);
