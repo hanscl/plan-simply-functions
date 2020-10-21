@@ -39,7 +39,3 @@ export { sendPasswordResetLink } from "./https_password_reset_email";
 export { laborEntryUpdate } from "./labor_entry_update";
 export { laborRemoveAccount } from "./labor_remove_account";
 export { getLaborValidations } from "./https_validate_labor";
-<<<<<<< HEAD
-=======
-
->>>>>>> 259-labor-validations
