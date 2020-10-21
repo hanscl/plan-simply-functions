@@ -3,12 +3,15 @@ import * as admin from "firebase-admin";
 export interface reportDoc {
     created_at: admin.firestore.Timestamp;
     output: "csv" | "xls" | "pdf";
+    div?: string;
+    dept?: string;
     plan_id: string;
-    plan_name: string;
+    plan_name?: string;
     version_id: string;
-    version_name: string;
+    version_name?: string;
     status: "processing" | "complete" | "error";
-    type: "accounts" | "pnl";
+    type: "accounts" | "pnl" | "labor";
+    user_id: string;
 }
 
 export interface acctExportCsv {
@@ -29,4 +32,12 @@ export interface acctExportCsv {
     p10?: number;
     p11?: number;
     p12?: number;
+}
+
+
+export interface reportRequest {
+    output: "csv" | "xls" | "pdf";
+    entity_id: string;
+    plan_id: string;
+    version_id: string;
 }

@@ -133,7 +133,7 @@ async function processRollupEntity(
       version_name: rollup_report.version_name,
       status: "processing",
       type: rollup_report.type,
-    //  user_id: rollup_report.user_id,
+      user_id: rollup_report.user_id,
     };
 
     // save to firestore

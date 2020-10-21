@@ -39,6 +39,7 @@ interface viewPeriod {
 }
 
 export interface accountDoc {
+  comment?: string;
   full_account: string;
   // basic account values
   acct: string;
