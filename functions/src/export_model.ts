@@ -33,3 +33,11 @@ export interface acctExportCsv {
     p11?: number;
     p12?: number;
 }
+
+
+export interface reportRequest {
+    output: "csv" | "xls" | "pdf";
+    entity_id: string;
+    plan_id: string;
+    version_id: string;
+}

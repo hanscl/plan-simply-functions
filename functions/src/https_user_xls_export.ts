@@ -2,18 +2,19 @@ import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import * as https_utils from "./https_utils";
 import * as export_model from "./export_model";
-import * as fs from "fs-extra";
 import * as path from "path";
 import * as os from "os";
 import * as user_model from "./user_model";
 import * as nodemailer from "nodemailer";
-import * as xls from "excel4node";
+import * as export_accounts from "./export_accounts_csv";
+import * as export_planlabor from "./export_planlabor_xls";
+
 const cors = require("cors")({ origin: true });
 const key = require("../alert-condition-291223-fe5b366c5ed9.json");
 
 const db = admin.firestore();
 
-export const processXlsExportRequest = functions.https.onRequest(async (request, response) => {
+export const entityExportRequest = functions.https.onRequest(async (request, response) => {
   cors(request, response, async () => {
     try {
       response.set("Access-Control-Allow-Origin", "*");
@@ -50,42 +51,36 @@ export const processXlsExportRequest = functions.https.onRequest(async (request,
         return;
       }
 
-      const xls_request = request.body as export_model.reportDoc;
+      const report_request = request.body as export_model.reportRequest;
 
-      const wb = new xls.Workbook();
-      var inc_ws = wb.addWorksheet("Sheet 1");
-      var labor_ws = wb.addWorksheet("Sheet 1");
+      let file_name = undefined;
+      let temp_file_path = undefined;
+      let subject = undefined;
+      if (report_request.output === "csv") {
+        file_name = `${report_request.entity_id}_Accounts_${report_request.version_id}.csv`;
+        temp_file_path = path.join(os.tmpdir(), file_name);
+        await export_accounts.exportAccountsToCsv(temp_file_path, report_request);
+        subject = `${report_request.entity_id} Accounts CSV Report`;
+      } else if (report_request.output === "xls") {
+        file_name = `${report_request.entity_id}_Pnl-Labor_${report_request.version_id}.xlsx`;
+        temp_file_path = path.join(os.tmpdir(), file_name);
+        await export_planlabor.exportPlanLaborToXls(temp_file_path, report_request);
+        subject = `${report_request.entity_id} P&L/Labor Excel Report`;
+      } else {
+        console.log(`Invalid report request format: ${report_request.output}`);
+        return;
+      }
 
-      // Create a reusable style
-      var style = wb.createStyle({
-        font: {
-          color: "#FF0800",
-          size: 10,
-        },
-        numberFormat: "$#,##0.00; ($#,##0.00); -",
-      });
-
-      // Set value of cell A1 to 100 as a number type styled with paramaters of style
-      inc_ws.cell(1, 1).number(100).style(style);
-
-      // Set value of cell A2 to 'string' styled with paramaters of style
-      labor_ws.cell(1, 1).string("string").style(style);
-
-      const file_name = "test.csv";
-      const temp_file_path = path.join(os.tmpdir(), file_name);
-      await wb.write(temp_file_path);
-      await fs.outputFile(temp_file_path, JSON.stringify(xls_request));
+      //await fs.outputFile(temp_file_path, JSON.stringify(xls_request));
 
       // get user email
       const email = (user_snap.data() as user_model.userDoc).email;
 
-      console.log(`Emailing XLS reports to ${email} -- ${JSON.stringify(xls_request)}`);
-      await emailReport(email, temp_file_path);
+      console.log(`Emailing XLS reports to ${email} -- ${JSON.stringify(report_request)}`);
+      await emailReport(email, temp_file_path, subject, file_name);
 
-      // createPlanXls();
-      // createLaborXls();
-      // emailReports();
-
+      // TODO: figure out how to clean up the file
+  //      fs.unlinkSync(temp_file_path);
       response.status(200).send({ result: `Report email dispatched.` });
     } catch (error) {
       console.log(`Error occured whil generating excel report: ${error}`);
@@ -94,19 +89,19 @@ export const processXlsExportRequest = functions.https.onRequest(async (request,
   });
 });
 
-async function emailReport(user_email: string, file_path: string) {
+
+async function emailReport(user_email: string, file_path: string, subject: string, filename: string) {
   const support_send_email = "noreply@zerobaseapp.com";
   const mailOptions = {
-    //from: "ZeroBase Support <noreply@zerobaseapp.com>",
     from: support_send_email,
     to: user_email,
-    subject: "ZeroBase Excel Report", // email subject
+    subject: subject, // email subject
     html: `Hello,<br><br>Attached please find the report you requested<br><br>
     Your ZeroBase Support team`, // email content in HTML
     attachments: [
       {
         // file on disk as an attachment
-        filename: "report.csv",
+        filename: filename,
         path: file_path, // stream this file
       },
     ],
