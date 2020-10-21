@@ -18,7 +18,6 @@ export { importDivisionsFromCsv } from "./cloudstorage_import_divs";
 export { importAccountsFromCsv } from "./cloudstorage_import_accts";
 
 // Reporting
-export { exportPlanVersionToCsv } from "./plan_version_csv_export";
 export { entityExportRequest } from "./https_user_xls_export";
 
 // View Stuff

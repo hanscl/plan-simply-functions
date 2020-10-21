@@ -75,8 +75,8 @@ export const entityExportRequest = functions.https.onRequest(async (request, res
 
       // get user email
       const email = (user_snap.data() as user_model.userDoc).email;
-
-      console.log(`Emailing XLS reports to ${email} -- ${JSON.stringify(report_request)}`);
+      
+      console.log(`Emailing ${JSON.stringify(report_request)} reports to ${email}`);
       await emailReport(email, temp_file_path, subject, file_name);
 
       // TODO: figure out how to clean up the file

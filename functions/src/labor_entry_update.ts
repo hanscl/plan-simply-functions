@@ -113,12 +113,12 @@ export const laborEntryUpdate = functions.firestore
       if (pos_doc_after.acct !== undefined && pos_doc_after.dept !== undefined) {
         await recalcGlAccount(context_params, pos_doc_after);
         // ... also if either ACCT/DEPT (or both) changed, then we need to recalculate the combination where the position was removed from
-        // if (
-        //   (pos_doc_before.acct !== pos_doc_after.acct || pos_doc_before.dept !== pos_doc_after.dept) &&
-        //   pos_doc_before.acct !== undefined &&
-        //   pos_doc_before.dept !== undefined
-        // )
-        //   await recalcGlAccount(context_params, pos_doc_before);
+        if (
+          (pos_doc_before.acct !== pos_doc_after.acct || pos_doc_before.dept !== pos_doc_after.dept) &&
+          pos_doc_before.acct !== undefined &&
+          pos_doc_before.dept !== undefined
+        )
+          await recalcGlAccount(context_params, pos_doc_before);
       }
     } catch (error) {
       console.log(`Error occured while processing labor update: ${error}`);
