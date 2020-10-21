@@ -64,6 +64,9 @@ export const getLaborValidations = functions.https.onRequest(async (request, res
 
       const dept_list: string[] = [];
       // obtain all depts
+      // HACK - always show all depts 
+      validation_request.path.dept = undefined;
+      validation_request.path.div = undefined;
       let dept_snap: undefined | FirebaseFirestore.QuerySnapshot;
       if (validation_request.path.dept !== undefined) {
         dept_list.push(validation_request.path.dept);
