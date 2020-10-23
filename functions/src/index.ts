@@ -1,4 +1,4 @@
-//export { backupFirestore } from "./firestore_backup";
+export { backupFirestore } from "./firestore_backup";
 
 // Security
 export { writeUserAccount } from "./custom_claims";
@@ -18,7 +18,7 @@ export { importDivisionsFromCsv } from "./cloudstorage_import_divs";
 export { importAccountsFromCsv } from "./cloudstorage_import_accts";
 
 // Reporting
-export { entityExportRequest } from "./https_user_xls_export";
+export { entityExportRequest } from "./https_entity_export";
 
 // View Stuff
 export { planVersionHierarchyGenerate } from "./plan_version_hier_generate";

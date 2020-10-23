@@ -200,6 +200,7 @@ async function createLaborXls(report_params: export_model.reportRequest, xls_she
     for (const pos_doc of labor_snap.docs) {
       const position = pos_doc.data() as labor_model.positionDoc;
       console.log(`Exporting Position ${pos_doc.id}: ${JSON.stringify(position)} into XLS row ...`);
+      if (position.acct === undefined || position.dept === undefined || position.status === undefined || position.pos === undefined) continue;
 
       xls_sheet.cell(row_ctr, 1).string(position.dept).style(xls_style);
       xls_sheet.cell(row_ctr, 2).string(position.acct).style(xls_style);

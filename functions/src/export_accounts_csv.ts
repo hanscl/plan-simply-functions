@@ -130,7 +130,7 @@ async function buildReportJson(report_params: export_model.reportRequest): Promi
         let multiplier = 1;
         if (fltrd_version_accts.length > 0) {
           values_arr = fltrd_version_accts[0].values;
-          console.log(`found matching account in version: ${JSON.stringify(fltrd_version_accts)}`);
+          //console.log(`found matching account in version: ${JSON.stringify(fltrd_version_accts)}`);
           if (fltrd_version_accts[0].acct_type !== "REV_TTL" && fltrd_version_accts[0].acct_type !== "STATS") multiplier = -1;
         }
 
@@ -142,7 +142,7 @@ async function buildReportJson(report_params: export_model.reportRequest): Promi
         csv_line.p06 = values_arr[5] * multiplier;
         csv_line.p07 = values_arr[6] * multiplier;
         csv_line.p08 = values_arr[7] * multiplier;
-        csv_line.p09 = values_arr[7] * multiplier;
+        csv_line.p09 = values_arr[8] * multiplier;
         csv_line.p10 = values_arr[9] * multiplier;
         csv_line.p11 = values_arr[10] * multiplier;
         csv_line.p12 = values_arr[11] * multiplier;

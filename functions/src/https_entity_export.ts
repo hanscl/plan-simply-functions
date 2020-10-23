@@ -4,6 +4,7 @@ import * as https_utils from "./https_utils";
 import * as export_model from "./export_model";
 import * as path from "path";
 import * as os from "os";
+import * as fs from "fs-extra";
 import * as user_model from "./user_model";
 import * as nodemailer from "nodemailer";
 import * as export_accounts from "./export_accounts_csv";
@@ -75,12 +76,11 @@ export const entityExportRequest = functions.https.onRequest(async (request, res
 
       // get user email
       const email = (user_snap.data() as user_model.userDoc).email;
-      
+
       console.log(`Emailing ${JSON.stringify(report_request)} reports to ${email}`);
       await emailReport(email, temp_file_path, subject, file_name);
 
-      // TODO: figure out how to clean up the file
-  //      fs.unlinkSync(temp_file_path);
+      fs.unlinkSync(temp_file_path);
       response.status(200).send({ result: `Report email dispatched.` });
     } catch (error) {
       console.log(`Error occured whil generating excel report: ${error}`);
@@ -88,7 +88,6 @@ export const entityExportRequest = functions.https.onRequest(async (request, res
     }
   });
 });
-
 
 async function emailReport(user_email: string, file_path: string, subject: string, filename: string) {
   const support_send_email = "noreply@zerobaseapp.com";
@@ -119,10 +118,10 @@ async function emailReport(user_email: string, file_path: string, subject: strin
     },
   });
 
-  await transporter.verify();
-  transporter.sendMail(mailOptions, (error, info) => {
-    if (error) {
-      throw new Error(`Error occured sending mail: ${JSON.stringify(error)}`);
-    }
-  });
+  try {
+    await transporter.verify();
+    await transporter.sendMail(mailOptions);
+  } catch (error) {
+    `Error occured sending mail: ${JSON.stringify(error)}`;
+  }
 }
