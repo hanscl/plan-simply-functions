@@ -19,6 +19,7 @@ export { importAccountsFromCsv } from "./cloudstorage_import_accts";
 
 // Reporting
 export { entityExportRequest } from "./https_entity_export";
+export { exportPlanVersionCsv } from "./https_plan_version_csv_export";
 
 // View Stuff
 export { planVersionHierarchyGenerate } from "./plan_version_hier_generate";
