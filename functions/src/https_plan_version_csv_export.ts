@@ -100,7 +100,7 @@ export const exportPlanVersionCsv = functions.https.onRequest(async (request, re
           }
         }
 
-        let subject = `Multiple Property Accounts CSV Reports`;
+        const subject = `Multiple Property Accounts CSV Reports`;
 
         //get user email
         const email = (user_snap.data() as user_model.userDoc).email;
