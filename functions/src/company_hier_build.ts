@@ -7,6 +7,7 @@ const db = admin.firestore();
 interface EntityChild {
   id: string;
   name: string;
+  number: string;
   type: string;
   entityChildren?: EntityChild[];
   divDeptChildren: entity_model.hierLevel[];
@@ -40,7 +41,13 @@ export const buildCompanyHierarchy = functions.firestore.document("entities/{ent
         if (allEnts[inner].doc.children !== undefined && allEnts[inner].doc.children?.includes(allEnts[outer].id)) isTopLevelEntity = false;
       }
       if (isTopLevelEntity) {
-        allEntitiesHier.push({ id: allEnts[outer].id, name: allEnts[outer].doc.name, type: allEnts[outer].doc.type, divDeptChildren: [] });
+        allEntitiesHier.push({
+          id: allEnts[outer].id,
+          name: allEnts[outer].doc.name,
+          number: allEnts[outer].doc.number,
+          type: allEnts[outer].doc.type,
+          divDeptChildren: [],
+        });
       }
     }
 
@@ -48,7 +55,7 @@ export const buildCompanyHierarchy = functions.firestore.document("entities/{ent
       await addChildren(topLevelParent, allEnts);
     }
 
-    await db.doc(`company_structure/hier`).set({children: allEntitiesHier});
+    await db.doc(`company_structure/hier`).set({ children: allEntitiesHier });
 
     console.log(`Top-level entities only: ${JSON.stringify(allEntitiesHier)}`);
   } catch (error) {
@@ -59,34 +66,39 @@ export const buildCompanyHierarchy = functions.firestore.document("entities/{ent
 
 async function addChildren(parentEntity: EntityChild, allEnts: EntityList[]) {
   try {
-  // add divdept hierarchy
-  const hierDoc = await db.doc(`entities/${parentEntity.id}/entity_structure/hier`).get();
-  if(!hierDoc.exists) throw new Error(`Could not find hierDoc`);
-  const hierData = hierDoc.data() as entity_model.hierDoc;
-  //parentEntity.divDeptChildren = [];
-  console.log(`hierData: ${JSON.stringify(hierData)}`);
-  for (const hierLevel of hierData.children) {
-    parentEntity.divDeptChildren.push(hierLevel);
-  }
-  const fltrdEntList = allEnts.filter((entity) => {
-    return entity.id === parentEntity.id;
-  });
-  console.log(`fltrdEntList: ${JSON.stringify(fltrdEntList)}`);
-  if (fltrdEntList.length > 0 && fltrdEntList[0].doc.children) {
-    parentEntity.entityChildren = [];
-    for (const childId of fltrdEntList[0].doc.children) {
-      const childEntArr = allEnts.filter((entity) => {
-        return entity.id === childId;
-      });
-      console.log(`childEntArr: ${JSON.stringify(childEntArr)}`);
-      if (childEntArr.length > 0) {
-        parentEntity.entityChildren.push({ id: childId, name: childEntArr[0].doc.name, type: childEntArr[0].doc.type, divDeptChildren: [] });
-        await addChildren(parentEntity.entityChildren[parentEntity.entityChildren.length - 1], allEnts);
+    // add divdept hierarchy
+    const hierDoc = await db.doc(`entities/${parentEntity.id}/entity_structure/hier`).get();
+    if (!hierDoc.exists) throw new Error(`Could not find hierDoc`);
+    const hierData = hierDoc.data() as entity_model.hierDoc;
+    //parentEntity.divDeptChildren = [];
+    console.log(`hierData: ${JSON.stringify(hierData)}`);
+    for (const hierLevel of hierData.children) {
+      parentEntity.divDeptChildren.push(hierLevel);
+    }
+    const fltrdEntList = allEnts.filter((entity) => {
+      return entity.id === parentEntity.id;
+    });
+    console.log(`fltrdEntList: ${JSON.stringify(fltrdEntList)}`);
+    if (fltrdEntList.length > 0 && fltrdEntList[0].doc.children) {
+      parentEntity.entityChildren = [];
+      for (const childId of fltrdEntList[0].doc.children) {
+        const childEntArr = allEnts.filter((entity) => {
+          return entity.id === childId;
+        });
+        console.log(`childEntArr: ${JSON.stringify(childEntArr)}`);
+        if (childEntArr.length > 0) {
+          parentEntity.entityChildren.push({
+            id: childId,
+            name: childEntArr[0].doc.name,
+            number: childEntArr[0].doc.number,
+            type: childEntArr[0].doc.type,
+            divDeptChildren: [],
+          });
+          await addChildren(parentEntity.entityChildren[parentEntity.entityChildren.length - 1], allEnts);
+        }
       }
     }
+  } catch (error) {
+    throw new Error(`Error during addChildren: ${error}`);
   }
-  }
-catch(error) {
-  throw new Error(`Error during addChildren: ${error}`);
-}
 }

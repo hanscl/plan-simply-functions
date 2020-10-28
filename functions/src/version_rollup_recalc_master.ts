@@ -69,6 +69,7 @@ export async function beginVersionRollupRecalc(
       console.log("Acct values did not change. Nothing else to be done");
       return;
     }
+    console.log(`before calling updateAccountInRollupEntities with recalc_params ${recalc_params} and acct_changes ${acct_changes}`);
     await rollup_entity_account_update.updateAccountInRollupEntities(recalc_params, acct_changes);
 
     // TODO move out of this functino to avoid slow updates
