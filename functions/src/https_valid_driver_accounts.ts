@@ -59,7 +59,7 @@ export const getValidDriverAccounts = functions.https.onRequest(
         );
 
         // STEP 1: Query the drivers for this version to see if there any accounts that are dependent on the account we are creating drivers for
-        const dep_accounts: string[] = [];
+        const dep_accounts: string[] = [context_params.account];
         const driven_acct_snaps = await db
           .collection(
             `entities/${context_params.entity}/drivers/${context_params.version_id}/dept`
