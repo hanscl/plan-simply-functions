@@ -79,6 +79,7 @@ export const exportPlanVersionCsv = functions.https.onRequest(async (request, re
         if (bulkExportRequest.action !== "export" || bulkExportRequest.plan === undefined || bulkExportRequest.version === undefined)
           throw new Error("Invalid request body.");
 
+        const exportPromises: Promise<any>[] = [];
         const entSnap = await db.collection("entities").where("type", "==", "entity").get();
         for (const entDoc of entSnap.docs) {
           const planSnap = await entDoc.ref.collection("plans").where("name", "==", bulkExportRequest.plan).get();
@@ -90,15 +91,22 @@ export const exportPlanVersionCsv = functions.https.onRequest(async (request, re
               const file_name = `${entDoc.id}_Accounts_${versionDoc.id}.csv`;
               const file_path = path.join(os.tmpdir(), file_name);
               files.push({ filename: file_name, path: file_path });
-              await export_accounts.exportAccountsToCsv(file_path, {
-                entity_id: entDoc.id,
-                output: "csv",
-                plan_id: planDoc.id,
-                version_id: versionDoc.id,
-              });
+              // run all reports synchronously
+              console.log(`STARTING export #${files.length}`);
+              exportPromises.push(
+                export_accounts.exportAccountsToCsv(file_path, {
+                  entity_id: entDoc.id,
+                  output: "csv",
+                  plan_id: planDoc.id,
+                  version_id: versionDoc.id,
+                })
+              );
             }
           }
         }
+
+        // now wait until all promises are resolved
+        await Promise.all(exportPromises);
 
         let subject = `Multiple Property Accounts CSV Reports`;
 
