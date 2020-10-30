@@ -6,6 +6,7 @@ export interface laborVersionDoc {
 export interface positionDoc {
   acct?: string;
   dept?: string;
+  div?: string; // for filtering only - do not display in UI
   pos: string;
   status?: "Salary" | "Hourly";
   rate?: rateMap;

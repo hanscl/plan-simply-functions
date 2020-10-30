@@ -96,6 +96,9 @@ export const laborEntryUpdate = functions.firestore
       const days_in_months = utils.getDaysInMonth(plan_doc.begin_year, plan_doc.begin_month);
       console.log(`Days in plan months are: ${JSON.stringify(days_in_months)}`);
 
+
+      
+
       const entity_doc = await db.doc(`entities/${context_params.entity_id}`).get();
       if (!entity_doc.exists) throw new Error(`no entity doc found for [entities/${context_params.entity_id}]`);
       const entity_labor_calcs = (entity_doc.data() as entity_model.entityDoc).labor_calcs;
@@ -105,6 +108,20 @@ export const laborEntryUpdate = functions.firestore
       else calculateWagesEU(pos_doc_after);
       calculateAvgFTEs(days_in_months, pos_doc_after.ftes);
       calculateRate(pos_doc_after);
+
+            // set/update the div on the position
+      const docPath = `entities/${context_params.entity_id}/entity_structure/dept`;
+      const deptDoc = await db.doc(docPath).get();
+      if(!deptDoc.exists) throw new Error(`Dept definition document not found in entity structure: ${docPath}`);
+      if(pos_doc_after.dept !== undefined) {
+        console.log(`deptdoc found -- finding div for pos`);
+        const deptDict = deptDoc.data() as entity_model.deptDict;
+        const divId = deptDict[pos_doc_after.dept].div;
+        console.log(`DIV ID for position is ${divId}`);
+        pos_doc_after.div = divId;
+      } else {
+        console.log(`no dept doc found or dept of pos undefined`);
+      }
 
       // write updated document
       // pos_doc_after.is_updating = false;

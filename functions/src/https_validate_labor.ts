@@ -6,11 +6,11 @@ const cors = require("cors")({ origin: true });
 
 const db = admin.firestore();
 
-export interface laborValidationRequest {
-  version_id: string;
-  plan_id: string;
-  path: { entity: string; div?: string; dept?: string };
-}
+  export interface laborValidationRequest {
+    version_id: string;
+    plan_id: string;
+    path: { entity: string; div?: string; dept?: string };
+  }
 
 export interface laborValidationResponse {
   valid_depts: string[];
