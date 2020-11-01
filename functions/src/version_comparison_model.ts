@@ -18,3 +18,23 @@ export interface VersionCompDocument {
   plansIds: string[];
   userIds: string[];
 }
+
+export interface AccountComp {
+  id: string;
+  level: string;
+  name: string;
+  values: CompRow[];
+  total: CompRow;
+}
+
+export interface CompSection {
+  children: AccountComp[];
+  rollup: AccountComp;
+}
+
+export interface CompRow {
+  base: number;
+  compare: number;
+  var: number;
+  pct: number;
+}
