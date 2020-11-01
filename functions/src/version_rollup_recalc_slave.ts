@@ -90,7 +90,7 @@ export async function executeVersionRollupRecalc(recalc_params: recalcParams, re
     if (acct_changes.months_changed.length === 0) {
       // save comments if they changed
       if(recalc_params.comments !== undefined && recalc_params.comments !== nlevel_acct_before.comments) {
-        await recalc_tx.update(acct_ref,  { comments: recalc_params.comments});
+        recalc_tx.update(acct_ref,  { comments: recalc_params.comments});
       }
       return undefined;
     }

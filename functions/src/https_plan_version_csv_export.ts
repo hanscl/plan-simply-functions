@@ -108,7 +108,7 @@ export const exportPlanVersionCsv = functions.https.onRequest(async (request, re
         // now wait until all promises are resolved
         await Promise.all(exportPromises);
 
-        let subject = `Multiple Property Accounts CSV Reports`;
+        const subject = `Multiple Property Accounts CSV Reports`;
 
         //get user email
         const email = (user_snap.data() as user_model.userDoc).email;

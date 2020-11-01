@@ -44,3 +44,4 @@ export { getLaborValidations } from "./https_validate_labor";
 
 // Version Comparison
 export { initVersionComparison } from "./version_comparison_init";
+export { processVersionComparison } from "./version_comparison_init";
