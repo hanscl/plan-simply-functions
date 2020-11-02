@@ -54,7 +54,7 @@ export const initVersionComparison = functions.region(config.cloudFuncLoc).https
       const compareSnap = await db.doc(`comps/${compParams.compareVersion.versionId}/base_versions/${compParams.baseVersion.versionId}`).get();
       if (!compareSnap.exists) {
         // create this comparison -> use cloud task cause this could take a few seconds ...
-        await cloudTasks.dispatchGCloudTask({ ...compParams, uid: uid }, "process-version-comparison", "general");
+        await cloudTasks.dispatchGCloudTask({ ...compParams, userId: uid } as compModel.VersionCompWithUser, "process-version-comparison", "general");
 
         response.status(200).send({ result: `Initializing Version Comparison ...` });
       } else {

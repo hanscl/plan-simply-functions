@@ -23,12 +23,18 @@ interface TempAcctItem {
   acctValues: TotalValues;
 }
 
+interface WhereCond {
+  field: string;
+  cond: string;
+}
+
 export async function createVersionComparison(options: compModel.VersionCompWithUser) {
   try {
+    console.log(`[createVersionComparison] called with options {${JSON.stringify(options)}}`);
     // create the document (or update in case this is a retry because the transaction failed)
     let compDocObj: compModel.VersionCompDocument | undefined = undefined;
     const dbEntityRef = db.doc(`entities/${options.entityId}`);
-    const compDocId = `${options.baseVersion}_${options.compareVersion}`;
+    const compDocId = `${options.baseVersion.versionId}_${options.compareVersion.versionId}`;
     const compDoc = await dbEntityRef.collection("comparisons").doc(compDocId).get();
 
     // if this document already exists, retain user ids
@@ -39,33 +45,53 @@ export async function createVersionComparison(options: compModel.VersionCompWith
     } else {
       compDocObj = {
         versionIds: [options.baseVersion.versionId, options.compareVersion.versionId],
-        plansIds: [options.baseVersion.planId, options.compareVersion.planId],
+        planIds: [options.baseVersion.planId, options.compareVersion.planId],
         userIds: [options.userId],
       }; // create a new document structure
     }
 
+    console.log(`[createVersionComparison] compDocObj before save to firestore: ${JSON.stringify(compDocObj)}`);
     if (!compDocObj) throw new Error(`Unable to retrieve or create version comparison object`);
 
     // set document (create or update)
-    await db.doc(compDocId).set(compDocObj);
+    await dbEntityRef.collection("comparisons").doc(compDocId).set(compDocObj);
 
     // begin transaction - lock the version document until we're done
     const txResult = await db.runTransaction(async (compTx) => {
       if (!compDocObj) return false;
 
+      // lock both version docs
       const versionDocs = [];
       for (let idx = 0; idx < compDocObj.versionIds.length; idx++) {
-        versionDocs.push(
-          await compTx.get(db.doc(`entities/${options.entityId}/plans/${compDocObj.plansIds[idx]}/versions/${compDocObj.versionIds[idx]}`))
-        );
+        versionDocs.push(await compTx.get(db.doc(`entities/${options.entityId}/plans/${compDocObj.planIds[idx]}/versions/${compDocObj.versionIds[idx]}`)));
       }
 
-      const compSections: compModel.CompSection[] = [];
-      await pnlRollupCollection(options, compTx, dbEntityRef, compSections);
-      // final updates here -=> timestamp version comparison doc
-      // recalc_tx.update(version_doc.ref, { last_update: admin.firestore.Timestamp.now() });
+      // store both plan-version refs
+      const compareVersionRef = dbEntityRef
+        .collection("plans")
+        .doc(options.compareVersion.planId)
+        .collection("versions")
+        .doc(options.compareVersion.versionId);
+      const baseVersionRef = dbEntityRef.collection("plans").doc(options.baseVersion.planId).collection("versions").doc(options.baseVersion.versionId);
 
-      return "all good";
+      const compSections: compModel.CompSection[] = [];
+      await pnlRollupCollection(options, compTx, compareVersionRef, baseVersionRef, compSections);
+      for (const level of ["div", "dept"]) await divDeptCollection(options, compTx, compareVersionRef, baseVersionRef, compSections, level);
+
+      // Let's see on the console what we got
+      // console.log(`Account Comparison Objects: ${JSON.stringify(compSections)}`);
+
+      for (const section of compSections) {
+        compTx.set(dbEntityRef.collection("comparisons").doc(compDocId).collection(section.rollup.level).doc(section.rollup.id), section);
+      }
+
+      compTx.update(dbEntityRef.collection("comparisons").doc(compDocId), {
+        last_updated: admin.firestore.Timestamp.now(),
+        last_accessed: admin.firestore.Timestamp.now(),
+        ready: true,
+      });
+
+      return "[createVersionComparison] completed successfully.";
     });
     console.log(txResult);
     return;
@@ -75,21 +101,74 @@ export async function createVersionComparison(options: compModel.VersionCompWith
   }
 }
 
+async function divDeptCollection(
+  options: compModel.VersionCompWithUser,
+  dbTx: FirebaseFirestore.Transaction,
+  compareVersionRef: FirebaseFirestore.DocumentReference,
+  baseVersionRef: FirebaseFirestore.DocumentReference,
+  compSections: compModel.CompSection[],
+  level: string
+) {
+  try {
+    // get all rollups from the compare version
+    const rollupAcctDocs = await dbTx.get(compareVersionRef.collection(level).where("class", "==", "rollup"));
+    for (const divDeptRollupDoc of rollupAcctDocs.docs) {
+      // get the pnl document data & create the minimal account object used across all levels
+      const compareRollupAcct = divDeptRollupDoc.data() as planModel.accountDoc;
+      const compareRollupTemp: TempAcctItem = {
+        acctValues: { total: compareRollupAcct.total, values: compareRollupAcct.values },
+        id: divDeptRollupDoc.id,
+        name: "Total",
+      };
+      // create the temp item for the base version rollup & attempt to populate with values from base version
+      const baseRollupTemp: TempAcctItem = { acctValues: { total: 0, values: utils.getValuesArray() }, id: divDeptRollupDoc.id, name: "Total" };
+      const baseRollupDoc = await dbTx.get(baseVersionRef.collection(level).doc(divDeptRollupDoc.id));
+      if (baseRollupDoc.exists) {
+        baseRollupTemp.acctValues.total = (baseRollupDoc.data() as viewModel.pnlAggregateDoc).total;
+        baseRollupTemp.acctValues.values = (baseRollupDoc.data() as viewModel.pnlAggregateDoc).values;
+      }
+
+      // query both versions, store the document and push the ID in the array if it doesn't exist yet
+      const compAcctIds: string[] = [];
+      const compAcctList: CompAccts = { compare: [], base: [] };
+
+      if (level === "div") {
+        const queryParams: WhereCond[] = [
+          { field: "acct", cond: compareRollupAcct.acct },
+          { field: "div", cond: compareRollupAcct.div },
+        ];
+        await getLineAccounts(dbTx, compareVersionRef, compAcctIds, compAcctList.compare, "dept", "equal", undefined, queryParams);
+        await getLineAccounts(dbTx, baseVersionRef, compAcctIds, compAcctList.base, "dept", "equal", undefined, queryParams);
+      } else if (compareRollupAcct.group && compareRollupAcct.group_children) {
+        await getLineAccounts(dbTx, compareVersionRef, compAcctIds, compAcctList.compare, "dept", "in", compareRollupAcct.group_children);
+        await getLineAccounts(dbTx, baseVersionRef, compAcctIds, compAcctList.base, "dept", "in", compareRollupAcct.group_children);
+      } else if (level === "dept" && compareRollupAcct.dept) {
+        const queryParams: WhereCond[] = [
+          { field: "parent_rollup.acct", cond: compareRollupAcct.acct },
+          { field: "dept", cond: compareRollupAcct.dept },
+        ];
+        await getLineAccounts(dbTx, compareVersionRef, compAcctIds, compAcctList.compare, "dept", "equal", undefined, queryParams);
+        await getLineAccounts(dbTx, baseVersionRef, compAcctIds, compAcctList.base, "dept", "equal", undefined, queryParams);
+      } else throw new Error("[divDeptCollection] No valid option to query line accounts. Nothing added to compSection.");
+
+      compSections.push({
+        rollup: createAccountComp(divDeptRollupDoc.id, { base: [baseRollupTemp], compare: [compareRollupTemp] }, level),
+        children: createCompChildren(compAcctIds, compAcctList, "dept"),
+      });
+    }
+  } catch (error) {
+    throw new Error(`Error ocurred in [divDeptCollection]: ${error}`);
+  }
+}
+
 async function pnlRollupCollection(
   options: compModel.VersionCompWithUser,
   dbTx: FirebaseFirestore.Transaction,
-  dbEntityRef: FirebaseFirestore.DocumentReference,
+  compareVersionRef: FirebaseFirestore.DocumentReference,
+  baseVersionRef: FirebaseFirestore.DocumentReference,
   compSections: compModel.CompSection[]
 ) {
   try {
-    // store both plan-version refs
-    const compareVersionRef = dbEntityRef
-      .collection("plans")
-      .doc(options.compareVersion.planId)
-      .collection("versions")
-      .doc(options.compareVersion.versionId);
-    const baseVersionRef = dbEntityRef.collection("plans").doc(options.baseVersion.planId).collection("versions").doc(options.baseVersion.versionId);
-
     // get all rollups from the compare version
     const rollupAcctDocs = await dbTx.get(compareVersionRef.collection("pnl"));
     for (const pnlRollupDoc of rollupAcctDocs.docs) {
@@ -115,18 +194,14 @@ async function pnlRollupCollection(
       const compAcctIds: string[] = [];
       const compAcctList: CompAccts = { compare: [], base: [] };
 
-      await getLineAccounts(dbTx, compareVersionRef, childAcctsToQuery, compAcctIds, compAcctList.compare);
-      await getLineAccounts(dbTx, baseVersionRef, childAcctsToQuery, compAcctIds, compAcctList.base);
+      await getLineAccounts(dbTx, compareVersionRef, compAcctIds, compAcctList.compare, "div", "in", childAcctsToQuery);
+      await getLineAccounts(dbTx, baseVersionRef, compAcctIds, compAcctList.base, "div", "in", childAcctsToQuery);
 
       compSections.push({
         rollup: createAccountComp(pnlRollupDoc.id, { base: [baseRollupTemp], compare: [compareRollupTemp] }, "pnl"),
         children: createCompChildren(compAcctIds, compAcctList, "div"),
       });
-
-      // also get the total pnl rollup from the base version.
     }
-    // Let's see on the console what we got
-    console.log(`Account Comparison Objects: ${JSON.stringify(compSections)}`);
   } catch (error) {
     throw new Error(`Error ocurred in [pnlRollupCollection]: ${error}`);
   }
@@ -213,13 +288,24 @@ function createCompRow(baseValue: number, compareValue: number): compModel.CompR
 async function getLineAccounts(
   dbTx: FirebaseFirestore.Transaction,
   versionRef: FirebaseFirestore.DocumentReference,
-  childAcctsToQuery: string[],
   acctIds: string[],
-  acctList: TempAcctItem[]
+  acctList: TempAcctItem[],
+  level: string,
+  queryType: "in" | "equal",
+  childAcctsToQuery?: string[],
+  whereQueries?: WhereCond[]
 ) {
   try {
     // get compare version accounts
-    const acctDocs = await dbTx.get(versionRef.collection("div").where("full_account", "in", childAcctsToQuery));
+    let acctDocs = undefined;
+    if (queryType === "in" && childAcctsToQuery) acctDocs = await dbTx.get(versionRef.collection(level).where("full_account", "in", childAcctsToQuery));
+    else if (whereQueries && whereQueries.length > 0) {
+      let query = versionRef.collection(level).where(whereQueries[0].field, "==", whereQueries[0].cond);
+      for (let idx = 1; idx < whereQueries.length; idx++) query = query.where(whereQueries[idx].field, "==", whereQueries[idx].cond);
+      acctDocs = await dbTx.get(query);
+    }
+
+    if (!acctDocs) throw new Error("[getLineAccounts] Empty query conditions. Cannot select line accounts.");
 
     for (const acctDoc of acctDocs.docs) {
       // add to the list of all accounts if it's not in there yet (outer join!)

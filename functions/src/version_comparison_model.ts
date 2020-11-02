@@ -15,7 +15,7 @@ interface PlanVersion {
 
 export interface VersionCompDocument {
   versionIds: string[];
-  plansIds: string[];
+  planIds: string[];
   userIds: string[];
 }
 
