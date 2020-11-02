@@ -1,3 +1,5 @@
+import * as admin from "firebase-admin";
+
 export interface VersionComp {
   entityId: string;
   baseVersion: PlanVersion;
@@ -14,9 +16,12 @@ interface PlanVersion {
 }
 
 export interface VersionCompDocument {
-  versionIds: string[];
-  planIds: string[];
-  userIds: string[];
+  version_ids: string[];
+  plan_ids: string[];
+  //userIds: string[];
+  last_updated: admin.firestore.Timestamp;
+  last_accessed: admin.firestore.Timestamp;
+  ready: boolean; 
 }
 
 export interface AccountComp {

@@ -40,18 +40,24 @@ export async function createVersionComparison(options: compModel.VersionCompWith
     // if this document already exists, retain user ids
     if (compDoc.exists) {
       compDocObj = compDoc.data() as compModel.VersionCompDocument;
-      // add user id from this request if it is not in the array yet
-      if (!compDocObj.userIds.includes(options.userId)) compDocObj.userIds.push(options.userId);
-    } else {
-      compDocObj = {
-        versionIds: [options.baseVersion.versionId, options.compareVersion.versionId],
-        planIds: [options.baseVersion.planId, options.compareVersion.planId],
-        userIds: [options.userId],
-      }; // create a new document structure
+      if (compDocObj.ready) {
+        // updated last accessed and return
+        dbEntityRef.collection("comparisons").doc(compDocId).update({ last_accessed: admin.firestore.Timestamp.now() });
+        return "[createVersionComparison] Success - Comparison already exists";
+      }
     }
 
-    console.log(`[createVersionComparison] compDocObj before save to firestore: ${JSON.stringify(compDocObj)}`);
+    compDocObj = {
+      version_ids: [options.baseVersion.versionId, options.compareVersion.versionId],
+      plan_ids: [options.baseVersion.planId, options.compareVersion.planId],
+      ready: false,
+      last_updated: admin.firestore.Timestamp.now(),
+      last_accessed: admin.firestore.Timestamp.now(),
+    };
+
     if (!compDocObj) throw new Error(`Unable to retrieve or create version comparison object`);
+
+    console.log(`[createVersionComparison] compDocObj before save to firestore: ${JSON.stringify(compDocObj)}`);
 
     // set document (create or update)
     await dbEntityRef.collection("comparisons").doc(compDocId).set(compDocObj);
@@ -62,8 +68,8 @@ export async function createVersionComparison(options: compModel.VersionCompWith
 
       // lock both version docs
       const versionDocs = [];
-      for (let idx = 0; idx < compDocObj.versionIds.length; idx++) {
-        versionDocs.push(await compTx.get(db.doc(`entities/${options.entityId}/plans/${compDocObj.planIds[idx]}/versions/${compDocObj.versionIds[idx]}`)));
+      for (let idx = 0; idx < compDocObj.version_ids.length; idx++) {
+        versionDocs.push(await compTx.get(db.doc(`entities/${options.entityId}/plans/${compDocObj.plan_ids[idx]}/versions/${compDocObj.version_ids[idx]}`)));
       }
 
       // store both plan-version refs
