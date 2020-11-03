@@ -18,10 +18,14 @@ interface PlanVersion {
 export interface VersionCompDocument {
   version_ids: string[];
   plan_ids: string[];
-  //userIds: string[];
   last_updated: admin.firestore.Timestamp;
   last_accessed: admin.firestore.Timestamp;
   ready: boolean; 
+}
+
+export interface CompSection {
+  children: AccountComp[];
+  rollup: AccountComp;
 }
 
 export interface AccountComp {
@@ -30,11 +34,6 @@ export interface AccountComp {
   name: string;
   values: CompRow[];
   total: CompRow;
-}
-
-export interface CompSection {
-  children: AccountComp[];
-  rollup: AccountComp;
 }
 
 export interface CompRow {

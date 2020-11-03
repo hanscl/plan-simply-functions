@@ -42,7 +42,7 @@ export async function createVersionComparison(options: compModel.VersionCompWith
       compDocObj = compDoc.data() as compModel.VersionCompDocument;
       if (compDocObj.ready) {
         // updated last accessed and return
-        dbEntityRef.collection("comparisons").doc(compDocId).update({ last_accessed: admin.firestore.Timestamp.now() });
+        await dbEntityRef.collection("comparisons").doc(compDocId).update({ last_accessed: admin.firestore.Timestamp.now() });
         return "[createVersionComparison] Success - Comparison already exists";
       }
     }
