@@ -1,6 +1,7 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import * as entity_model from "./entity_model";
+import * as config from "./config";
 
 const db = admin.firestore();
 
@@ -26,7 +27,7 @@ interface EntityList {
 }
 
 // TODO: This needs to be also triggered on new entity create
-export const buildCompanyHierarchy = functions.firestore.document("entities/{entityId}/entity_structure/hier").onWrite(async (snapshot, context) => {
+export const buildCompanyHierarchy = functions.region(config.cloudFuncLoc).firestore.document("entities/{entityId}/entity_structure/hier").onWrite(async (snapshot, context) => {
   try {
     const allEntitiesHier: EntityChild[] = [];
     const entSnap = await db.collection("entities").get();

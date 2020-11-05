@@ -3,6 +3,26 @@ export interface laborVersionDoc {
   version_id: string;
 }
 
+export interface SavePositionRequest {
+  action: "create" | "update" | "delete";
+  entityId: string;
+  versionId: string;
+  positionId?: string; //firstore document id
+  data?: PositionData;
+}
+
+export interface PositionData {
+  acct: string;
+  dept: string;
+  pos: string;
+  status: "Salary" | "Hourly";
+  rate: { annual?: number; hourly?: number };
+  fte_factor: number;
+  bonus_option: "None" | "Percent" | "Value";
+  bonus?: laborCalc;
+  socialsec_pct: number;
+}
+
 export interface positionDoc {
   acct?: string;
   dept?: string;
@@ -11,9 +31,13 @@ export interface positionDoc {
   status?: "Salary" | "Hourly";
   rate?: rateMap;
   fte_factor?: number;
+  bonus_option?: "None" | "Percent" | "Value";
+  bonus?: laborCalc;
   wages?: laborCalc;
   ftes?: laborCalc;
-  is_updating?: boolean;
+  socialsec_pct?: number;
+  socialsec: laborCalc;
+  //is_updating?: boolean;
 }
 
 interface rateMap {
@@ -38,6 +62,6 @@ export interface laborValidationResponse {
 }
 
 export interface laborValidationResponseAlt {
-    valid_depts: string[];
-    valid_accts: { dept_id: string; acct_ids: string; }[];
-  }
+  valid_depts: string[];
+  valid_accts: { dept_id: string; acct_ids: string }[];
+}

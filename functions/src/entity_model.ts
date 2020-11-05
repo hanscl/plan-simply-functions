@@ -13,6 +13,11 @@ export interface entityDoc {
 }
 
 export interface laborCalcs {
+  default_accts: {
+    bonus: string;
+    socialsec: string;
+    }
+  socialsec_pct?: number;
   wage_method: "eu" | "us";
 }
 
