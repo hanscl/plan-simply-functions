@@ -46,11 +46,11 @@ export async function driverDependencyBuild(
     }
 
     // load driver account ids
-    const all_driver_accts: string[] = [];
-    const driver_acct_snap = await entity_doc_snap.ref.collection("drivers").doc(driver_params.version_id).collection("dept").get();
-    for (const drv_acct of driver_acct_snap.docs) {
-      all_driver_accts.push(drv_acct.id);
-    }
+    // const all_driver_accts: string[] = [];
+    // const driver_acct_snap = await entity_doc_snap.ref.collection("drivers").doc(driver_params.version_id).collection("dept").get();
+    // for (const drv_acct of driver_acct_snap.docs) {
+    //   all_driver_accts.push(drv_acct.id);
+    // }
 
     /***** 2. PROCEED WITH DEPENDENCY BUILD *****/
 
@@ -80,7 +80,7 @@ export async function driverDependencyBuild(
     console.log(`acct_list: ${JSON.stringify(acct_list)}`);
 
     // Recursive function to resolve all rollups
-    return await resolveRollups(acct_list, entity, rollups, div_dict, acct_dict, groups, driver_params, all_driver_accts);
+    return await resolveRollups(acct_list, entity, rollups, div_dict, acct_dict, groups); 
   } catch (error) {
     console.log("Error occured during driver dependency build: " + error);
     return;
@@ -182,9 +182,7 @@ async function resolveRollups(
   rollups: entity_model.rollupObj[],
   div_dict: entity_model.divDict,
   acct_dict: entity_model.acctDict,
-  groups: entity_model.groupObj[],
-  driver_params: driver_model.driverParamsAll,
-  all_driver_accts: string[]
+  groups: entity_model.groupObj[]
 ): Promise<string[]> {
   let acct_lst_copy = acct_lst;
   for (let idx = acct_lst_copy.length - 1; idx >= 0; idx--) {
@@ -198,73 +196,11 @@ async function resolveRollups(
             rollups,
             div_dict,
             acct_dict,
-            groups,
-            driver_params,
-            all_driver_accts
+            groups
           ),
           acct_lst_copy.slice(idx + 1)
         );
-    } else {
-      // recursive call ends at n-level account => resolve driver dependency
-      if (all_driver_accts.includes(acct_lst_copy[idx])) {
-        acct_lst_copy = acct_lst_copy
-          .slice(0, idx)
-          .concat(
-            await resolveRollups(
-              await getDriverAccounts(acct_lst_copy[idx], driver_params),
-              entity,
-              rollups,
-              div_dict,
-              acct_dict,
-              groups,
-              driver_params,
-              all_driver_accts
-            ),
-            acct_lst_copy.slice(idx + 1)
-          );
-      }
     }
   }
   return acct_lst_copy;
-}
-
-async function getDriverAccounts(acct: string, driver_params: driver_model.driverParamsAll): Promise<string[]> {
-  const driver_doc = await db.doc(`entities/${driver_params.entity_id}/drivers/${driver_params.version_id}/dept/${acct}`).get();
-  if (!driver_doc.exists) throw new Error("Could not find driver document inside getDriverAccounts. That should not happen!");
-
-  const driver_list = (driver_doc.data() as driver_model.acctDriverDef).drivers;
-
-  // filter down to acct_types
-  const ret_acct_list: string[] = [];
-
-  // remove static driver values from list so we only have accounts
-  const driver_accts: driver_model.driverEntry[] = driver_list.filter((driver_entry) => {
-    return driver_entry.type === "acct";
-  });
-
-  // for (const drv_entry of driver_list) {
-  //   if (drv_entry.type === "acct") ret_acct_list.push((drv_entry.entry as driver_model.driverAcct).id);
-  // }
-
-  for (const drv_acct of driver_accts) {
-    const drv_entry = drv_acct.entry as driver_model.driverAcct;
-    // resolve pnl entries to its children first and push the children instead of the id
-    if (drv_entry.level === "pnl") {
-      const pnl_doc = await db
-        .doc(`entities/${driver_params.entity_id}/plans/${driver_params.plan_id}/versions/${driver_params.version_id}/pnl/${drv_entry.id}`)
-        .get();
-      if (!pnl_doc.exists) {
-        // console.log(`Unable to resolve PNL document from driver`);
-        continue;
-      }
-      const pnl_obj = pnl_doc.data() as view_model.pnlAggregateDoc;
-      // console.log(`P&L Object: ${JSON.stringify(pnl_obj)}`);
-      for (const child_acct of pnl_obj.child_accts) {
-        ret_acct_list.push(child_acct);
-      }
-    } else ret_acct_list.push(drv_entry.id);
-  }
-
-  console.log(`returning account list from driver accts call -- ${acct} - ${JSON.stringify(driver_params)} - ${ret_acct_list}`);
-  return ret_acct_list;
 }
