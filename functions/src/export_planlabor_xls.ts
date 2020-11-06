@@ -91,7 +91,7 @@ async function createPlanXls(report_params: export_model.reportRequest, xls_shee
     let row_idx = 2;
     for (const section_doc of sections.docs) {
       const section = section_doc.data() as view_model.viewSection;
-      if (section.header) xls_sheet.cell(row_idx, 1).string(section.name.toUpperCase()).style(header_style);
+      if (section.header) xls_sheet.cell(++row_idx, 1).string(section.name.toUpperCase()).style(header_style);
       if (section.lines) {
         for (const line of section.lines) {
           row_idx = await addPlanLine(report_params, xls_sheet, xls_style, line, row_idx + 1, 1);
@@ -109,7 +109,8 @@ async function createPlanXls(report_params: export_model.reportRequest, xls_shee
           console.log(`Looking for Totals doc, but could not find`);
           continue;
         }
-        // acct exists. add line to sheet
+        // acct exists. add line to sheet. increase row_idx first!
+        row_idx++;
         const totals = totals_doc.data() as view_model.pnlAggregateDoc;
         xls_sheet.cell(row_idx, 1).string(`TOTAL ${section.name.toUpperCase()}`).style(totals_desc);
         // Set month & total headers
@@ -121,7 +122,7 @@ async function createPlanXls(report_params: export_model.reportRequest, xls_shee
         }
         xls_sheet.cell(row_idx, 14).number(totals.total).style(totals_style);
       }
-      row_idx = row_idx + 2;
+      row_idx++; // = row_idx + 2;
     }
   } catch (error) {
     console.log(`Error while creating xls export ${JSON.stringify(report_params)}: ${error}`);
@@ -142,7 +143,10 @@ async function addPlanLine(
     const acct_doc = await db
       .doc(`entities/${report_params.entity_id}/plans/${report_params.plan_id}/versions/${report_params.version_id}/${acct_line.level}/${acct_line.acct}`)
       .get();
-    if (!acct_doc.exists) return upd_idx;
+    if (!acct_doc.exists) {
+      console.log(`Export row account not found: ${JSON.stringify(acct_line)} :: ${JSON.stringify(report_params)}`);
+      return upd_idx;
+    }
     // acct exists. add line to sheet
     const account = acct_doc.data() as plan_model.accountDoc;
     xls_sheet
