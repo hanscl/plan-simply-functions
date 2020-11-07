@@ -2,6 +2,7 @@ import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import * as driver_model from "./driver_model";
 import * as view_model from "./view_model";
+import * as config from "./config";
 const cors = require("cors")({ origin: true });
 
 const db = admin.firestore();
@@ -13,7 +14,7 @@ interface contextParams {
   account: string;
 }
 
-export const getValidDriverAccounts = functions.https.onRequest(
+export const getValidDriverAccounts = functions.region(config.cloudFuncLoc).https.onRequest(
   async (request, response) => {
     cors(request, response, async () => {
       try {

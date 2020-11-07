@@ -1,6 +1,7 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import * as https_utils from "./https_utils";
+import * as config from "./config";
 import * as path from "path";
 import * as os from "os";
 import * as fs from "fs-extra";
@@ -30,7 +31,7 @@ interface FilePathName {
   path: string;
 }
 
-export const exportPlanVersionCsv = functions.https.onRequest(async (request, response) => {
+export const exportPlanVersionCsv = functions.region(config.cloudFuncLoc).https.onRequest(async (request, response) => {
   cors(request, response, async () => {
     try {
       response.set("Access-Control-Allow-Origin", "*");

@@ -2,6 +2,7 @@ import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import * as https_utils from "./https_utils";
 import * as export_model from "./export_model";
+import * as config from "./config";
 import * as path from "path";
 import * as os from "os";
 import * as fs from "fs-extra";
@@ -15,7 +16,7 @@ const key = require("../alert-condition-291223-fe5b366c5ed9.json");
 
 const db = admin.firestore();
 
-export const entityExportRequest = functions.https.onRequest(async (request, response) => {
+export const entityExportRequest = functions.region(config.cloudFuncLoc).https.onRequest(async (request, response) => {
   cors(request, response, async () => {
     try {
       response.set("Access-Control-Allow-Origin", "*");

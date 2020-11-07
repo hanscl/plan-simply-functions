@@ -1,6 +1,7 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import * as https_utils from "./https_utils";
+import * as config from "./config";
 import { accountDoc } from "./plan_model";
 const cors = require("cors")({ origin: true });
 
@@ -22,7 +23,7 @@ interface laborValidAcctsByDept {
   acct_id: string;
 }
 
-export const getLaborValidations = functions.https.onRequest(async (request, response) => {
+export const getLaborValidations = functions.region(config.cloudFuncLoc).https.onRequest(async (request, response) => {
   cors(request, response, async () => {
     try {
       response.set("Access-Control-Allow-Origin", "*");

@@ -2,6 +2,7 @@ import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import * as https_utils from "./https_utils";
 import * as version_recalc from "./version_rollup_recalc_master";
+import * as config from "./config";
 const cors = require("cors")({ origin: true });
 
 const db = admin.firestore();
@@ -15,7 +16,7 @@ interface recalcParams {
   dept?: string;
 }
 
-export const saveItemizedEntry = functions.https.onRequest(async (request, response) => {
+export const saveItemizedEntry = functions.region(config.cloudFuncLoc).https.onRequest(async (request, response) => {
   cors(request, response, async () => {
     try {
       response.set("Access-Control-Allow-Origin", "*");

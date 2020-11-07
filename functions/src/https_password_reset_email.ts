@@ -1,11 +1,12 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import * as nodemailer from "nodemailer";
+import * as config from "./config";
 const cors = require("cors")({ origin: true });
 const key = require("../alert-condition-291223-fe5b366c5ed9.json");
  
 
-export const sendPasswordResetLink = functions.https.onRequest(
+export const sendPasswordResetLink = functions.region(config.cloudFuncLoc).https.onRequest(
   async (req, res) => {
     cors(req, res, async () => {
       // getting dest email by query string
