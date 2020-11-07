@@ -202,5 +202,5 @@ async function resolveRollups(
         );
     }
   }
-  return acct_lst_copy;
+  return [...new Set(acct_lst_copy)];
 }
