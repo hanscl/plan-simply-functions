@@ -1,9 +1,12 @@
 import * as admin from "firebase-admin";
+import * as functions from "firebase-functions";
 import * as plan_model from "./plan_model";
 import * as utils from "./utils";
 import * as version_recalc_slave from "./version_rollup_recalc_slave";
 import * as rollup_entity_account_update from "./rollup_entity_account_update";
 import * as driver_calc from "./driver_calc";
+import * as config from "./config";
+import * as https_utils from "./https_utils";
 
 const db = admin.firestore();
 
@@ -15,6 +18,13 @@ interface recalcParams {
   values: number[];
   dept?: string;
   comments?: string;
+}
+
+export interface RecalcRequest {
+  recalc_params: recalcParams;
+  user_initiated: boolean;
+  caller_id: "entry" | "driver" | "labor" | "entity_rollup";
+  passed_acct_changes?: version_recalc_slave.acctChanges;
 }
 
 export async function beginVersionRollupRecalc(
@@ -114,3 +124,22 @@ async function isUpdatedAllowed(recalc_params: recalcParams, acct_list: plan_mod
     return false;
   }
 }
+
+export const versionRollupRecalcGCT = functions.region(config.cloudFuncLoc).https.onRequest(async (request, response) => {
+  try {
+    // Verify the request
+    await https_utils.verifyCloudTaskRequest(request, "version-rollup-recalc");
+
+    // get the request body
+
+    const recalcReq = request.body as RecalcRequest;
+
+    console.log(`Running versionRollupRecalcGCT with parameters: ${JSON.stringify(recalcReq)}`);
+    await beginVersionRollupRecalc(recalcReq.recalc_params, recalcReq.user_initiated, recalcReq.caller_id, recalcReq.passed_acct_changes);
+
+    response.status(200).send({ result: `Version Comparison ready.` });
+  } catch (error) {
+    console.log(`Error occured while requesting versionRollupRecalcGCT: ${error}`);
+    response.status(500).send({ result: `Could not execute versionRollupRecalcGCT. Please contact support` });
+  }
+});

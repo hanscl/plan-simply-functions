@@ -198,7 +198,7 @@ async function createLaborXls(report_params: export_model.reportRequest, xls_she
     const labor_snap = await db.collection(`entities/${report_params.entity_id}/labor/${report_params.version_id}/positions`).get();
     let row_ctr = 2;
     for (const pos_doc of labor_snap.docs) {
-      const position = pos_doc.data() as labor_model.positionDoc;
+      const position = pos_doc.data() as labor_model.PositionDoc;
       console.log(`Exporting Position ${pos_doc.id}: ${JSON.stringify(position)} into XLS row ...`);
       if (position.acct === undefined || position.dept === undefined || position.status === undefined || position.pos === undefined) continue;
 

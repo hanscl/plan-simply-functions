@@ -1,3 +1,5 @@
+import * as admin from "firebase-admin";
+
 export interface laborVersionDoc {
   plan_id: string;
   version_id: string;
@@ -21,30 +23,33 @@ export interface PositionData {
   fte_factor: number;
   ftes: number[];
   bonus_option: "None" | "Percent" | "Value";
+  bonus_pct?: number;
   bonus?: number[];
   socialsec_pct: number;
 }
 
-export interface positionDoc {
-  acct?: string;
-  dept?: string;
-  div?: string; // for filtering only - do not display in UI
+export interface PositionDoc {
+  acct: string;
+  dept: string;
+  div: string; 
   pos: string;
-  status?: "Salary" | "Hourly";
-  rate?: rateMap;
-  fte_factor?: number;
-  bonus_option?: "None" | "Percent" | "Value";
-  bonus?: laborCalc;
-  wages?: laborCalc;
-  ftes?: laborCalc;
-  socialsec_pct?: number;
+  wage_type: "Salary" | "Hourly";
+  status?: "Salary" | "Hourly"; // TODO: REMOVE WHEN PROD POSITIONS HAVE BEEN UPDATED
+  rate: rateMap;
+  fte_factor: number;
+  bonus_option: "None" | "Percent" | "Value";
+  bonus: laborCalc;
+  bonus_pct: number;
+  wages: laborCalc;
+  ftes: laborCalc;
+  socialsec_pct: number;
   socialsec: laborCalc;
-  //is_updating?: boolean;
+  last_updated: admin.firestore.Timestamp;
 }
 
-interface rateMap {
-  annual?: number;
-  hourly?: number;
+export interface rateMap {
+  annual: number;
+  hourly: number;
 }
 
 export interface laborCalc {

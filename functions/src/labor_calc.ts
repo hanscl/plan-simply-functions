@@ -1,8 +1,6 @@
 import * as laborModel from "./labor_model";
 import * as utils from "./utils";
 
-
-
 export function calculateWagesEU(posData: laborModel.PositionData, ftes: number[]): laborModel.laborCalc {
   try {
     // initialize wage data with zeroes
@@ -58,8 +56,9 @@ export function calculateWagesUS(posData: laborModel.PositionData, days_in_month
   }
 }
 
-export function calculateAvgFTEs(days_in_months: number[], ftes: laborModel.laborCalc) {
+export function calculateAvgFTEs(days_in_months: number[], fteByMonth: number[]): laborModel.laborCalc {
   try {
+    const ftes: laborModel.laborCalc = { total: 0, values: fteByMonth };
     const days_in_year = days_in_months.reduce((a, b) => {
       return a + b;
     }, 0);
@@ -70,21 +69,57 @@ export function calculateAvgFTEs(days_in_months: number[], ftes: laborModel.labo
     }
 
     ftes.total = utils.finRound(avg_ftes);
+
+    return ftes;
   } catch (error) {
     throw new Error(`Error occured during [calculateAvgFTEs]`);
   }
 }
 
-export function calculateRate(posData: laborModel.PositionData) {
+export function calculateRate(posData: laborModel.PositionData): laborModel.rateMap {
   try {
-    if (posData.rate === undefined || posData.fte_factor === undefined) return;
+    if (!posData.rate || !posData.fte_factor) throw new Error("Need FTE Factor and rate definition");
 
-    if (posData.status === "Hourly" && posData.rate.hourly !== undefined) {
-      posData.rate.annual = utils.finRound(posData.rate.hourly * posData.fte_factor);
-    } else if (posData.status === "Salary" && posData.rate.annual !== undefined) {
-      posData.rate.hourly = utils.finRound(posData.rate.annual / posData.fte_factor);
+    const rateMap: laborModel.rateMap = { annual: 0, hourly: 0 };
+
+    if (posData.status === "Hourly" && posData.rate.hourly) {
+      rateMap.hourly = posData.rate.hourly;
+      rateMap.annual = utils.finRound(rateMap.hourly * posData.fte_factor);
+    } else if (posData.status === "Salary" && posData.rate.annual) {
+      rateMap.annual = posData.rate.annual;
+      rateMap.hourly = utils.finRound(rateMap.annual / posData.fte_factor);
     }
+
+    return rateMap;
   } catch (error) {
     throw new Error(`Error occured during [calculateRate]: ${error}`);
   }
+}
+
+export function calculateBonus(posData: laborModel.PositionData, wages: number[]): laborModel.laborCalc {
+  const bonus: laborModel.laborCalc = { total: 0, values: utils.getValuesArray() };
+
+  if (posData.bonus_option === "Value") {
+    bonus.total = utils.finRound(
+      bonus.values.reduce((a, b) => {
+        return a + b;
+      }, 0)
+    );
+  } else if (posData.bonus_option === "Percent") {
+    bonus.values = wages.map((val) => {
+      return val * (posData.bonus_pct ? posData.bonus_pct : 0);
+    });
+  }
+
+  return bonus;
+}
+
+export function calculateSocialSec(posData: laborModel.PositionData, wages: number[]): laborModel.laborCalc {
+  const socialsec: laborModel.laborCalc = { total: 0, values: utils.getValuesArray() };
+
+  socialsec.values = wages.map((val) => {
+    return val * posData.socialsec_pct;
+  });
+
+  return socialsec;
 }

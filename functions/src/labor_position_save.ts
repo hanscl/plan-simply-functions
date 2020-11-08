@@ -63,12 +63,10 @@ export const laborPositionRequest = functions.region(config.cloudFuncLoc).https.
 
       checkEntityLaborDefs(entityLaborDefs);
 
-      if (laborPosRequest.action === "create") {
-        await createLaborPosition(laborPosRequest, entityLaborDefs);
-      } else if (laborPosRequest.action === "update") {
-        await updateLaborPosition(laborPosRequest);
-      } else if (laborPosRequest.action === "delete") {
-        await deleteLaborPosition(laborPosRequest);
+      if (laborPosRequest.action === "create" || laborPosRequest.action === "update") {
+        await createOrUpdateLaborPosition(laborPosRequest, entityLaborDefs);
+      } else if (laborPosRequest.action === "delete" && laborPosRequest.positionId) {
+        await deleteLaborPosition(laborPosRequest.entityId, laborPosRequest.versionId, laborPosRequest.positionId);
       } else
         throw new Error(
           `Unable to process request to save Labor position. Invalid action specified: '${laborPosRequest.action}'. Valid actions are 'create', 'update', 'save'`
@@ -85,38 +83,132 @@ export const laborPositionRequest = functions.region(config.cloudFuncLoc).https.
   });
 });
 
-async function createLaborPosition(posReq: laborModel.SavePositionRequest, entityLaborDefs: entityModel.laborCalcs) {
+async function deleteLaborPosition(entityId: string, versionId: string, positionId: string) {
   try {
-    // calculatye wages
-    const wages = await calculateWages(posReq, entityLaborDefs.wage_method);
-    if(!wages) throw new Error("Unable to calculate wages.");
+    await db.doc(`entities/${entityId}/labor/${versionId}/positions/${positionId}`).delete();
+  } catch (error) {
+    throw new Error(`Error in [deleteLaborPosition]: ${error}`);
+  }
+}
+
+async function createOrUpdateLaborPosition(posReq: laborModel.SavePositionRequest, entityLaborDefs: entityModel.laborCalcs) {
+  try {
+    if (!posReq.data) throw new Error("No data to create new position");
+
+    // get the days in the month for this plan
+    const daysInMonths = await getDaysInMonths(posReq);
+
+    // calculate wages
+    const wages = getWages(posReq, entityLaborDefs.wage_method, daysInMonths);
+    if (!wages) throw new Error("Unable to calculate wages.");
 
     // calculate bonus
+    const bonus = laborCalc.calculateBonus(posReq.data, wages.values);
 
     // calculate social security
+    const socialsec = laborCalc.calculateSocialSec(posReq.data, wages.values);
 
     // calculate avg FTEs
+    const ftes = laborCalc.calculateAvgFTEs(daysInMonths, posReq.data.ftes);
+
+    // 1. get old values & lock document in tx
+    // for (wages, bonus, socialsec)
+    // 2. calculate difference
+    // 3. schedule cloud task
+    // save document & end tx
+
+   // create this comparison -> use cloud task cause this could take a few seconds ...
+   await cloudTasks.dispatchGCloudTask({ ...compParams, userId: uid } as compModel.VersionCompWithUser, "process-version-comparison", "general");
+
 
     // save document
+    savePosition(posReq, wages, bonus, socialsec, ftes);
   } catch (error) {
     throw new Error(`Error in [createLaborPosition]: ${error}`);
   }
 }
 
-async function calculateWages(
+async function savePosition(
   posReq: laborModel.SavePositionRequest,
-  wageMethod: string
-): Promise<laborModel.laborCalc | undefined> {
+  wages: laborModel.laborCalc,
+  bonus: laborModel.laborCalc,
+  socialsec: laborModel.laborCalc,
+  ftes: laborModel.laborCalc
+) {
+  try {
+    if (!posReq.data) throw new Error("Must have position data for saving document");
+
+    // make sure the labor document exists for this version
+    const laborDocRef = await createVersionLaborDoc(posReq);
+
+    // create the document
+    const laborDoc: laborModel.PositionDoc = {
+      acct: posReq.data.acct,
+      dept: posReq.data.dept,
+      div: await getPositionDiv(posReq.entityId, posReq.data.dept),
+      pos: posReq.data.pos,
+      wage_type: posReq.data.status,
+      fte_factor: posReq.data.fte_factor,
+      ftes: ftes,
+      rate: laborCalc.calculateRate(posReq.data),
+      wages: wages,
+      bonus_option: posReq.data.bonus_option,
+      bonus_pct: posReq.data.bonus_pct ? posReq.data.bonus_pct : 0,
+      bonus: bonus,
+      socialsec_pct: posReq.data.socialsec_pct,
+      socialsec: socialsec,
+      last_updated: admin.firestore.Timestamp.now(),
+    };
+
+    // & save
+    if (posReq.positionId) {
+      await laborDocRef.collection("positions").doc(posReq.positionId).set(laborDoc);
+    } else {
+      await laborDocRef.collection("positions").add(laborDoc);
+    }
+  } catch (error) {
+    throw new Error(`Error in [savePosition]: ${error}`);
+  }
+}
+
+async function getPositionDiv(entityId: string, deptId: string): Promise<string> {
+  const docPath = `entities/${entityId}/entity_structure/dept`;
+  const deptDoc = await db.doc(docPath).get();
+  if (!deptDoc.exists) throw new Error(`Dept definition document not found in entity structure: ${docPath}`);
+
+  const deptDict = deptDoc.data() as entityModel.deptDict;
+
+  const divId = deptDict[deptId].div;
+  if (!divId) throw new Error(`could not find divID for ${deptId}`);
+
+  return divId;
+}
+
+async function createVersionLaborDoc(posReq: laborModel.SavePositionRequest): Promise<FirebaseFirestore.DocumentReference> {
+  try {
+    const laborDocRef = db.doc(`entities/${posReq.entityId}/labor/${posReq.versionId}`);
+
+    // see if the document exists already
+    let versionLaborDoc = await laborDocRef.get();
+    if (!versionLaborDoc.exists) {
+      await laborDocRef.set({
+        plan_id: posReq.planId,
+        version_id: posReq.versionId,
+      });
+    }
+
+    return laborDocRef;
+  } catch (error) {
+    throw new Error(`Error in [createVersionLaborDoc]`);
+  }
+}
+
+function getWages(posReq: laborModel.SavePositionRequest, wageMethod: string, daysInMonths: number[]): laborModel.laborCalc | undefined {
   try {
     if (posReq.data === undefined) throw new Error(`Position data is undefined`);
 
     if (wageMethod === "us") {
-      // get the plan data for days in the month
-      const planDoc = await db.doc(`entities/${posReq.entityId}/plans/${posReq.planId}`).get();
-      if (!planDoc.exists) throw new Error(`Plan ${posReq.planId} does not exist for entity ${posReq.entityId}`);
-      const planData = planDoc.data() as planModel.planDoc;
-      const days_in_months = utils.getDaysInMonth(planData.begin_year, planData.begin_month);
-      return laborCalc.calculateWagesUS(posReq.data, days_in_months, posReq.data.ftes);
+      return laborCalc.calculateWagesUS(posReq.data, daysInMonths, posReq.data.ftes);
     } else if (wageMethod === "eu") {
       return laborCalc.calculateWagesEU(posReq.data, posReq.data.ftes);
     } else {
@@ -125,6 +217,15 @@ async function calculateWages(
   } catch (error) {
     throw new Error(`Error occured in [calculateWages]: ${error}`);
   }
+}
+
+async function getDaysInMonths(posReq: laborModel.SavePositionRequest): Promise<number[]> {
+  const planDoc = await db.doc(`entities/${posReq.entityId}/plans/${posReq.planId}`).get();
+  if (!planDoc.exists) throw new Error(`Plan ${posReq.planId} does not exist for entity ${posReq.entityId}`);
+  const planData = planDoc.data() as planModel.planDoc;
+  const days_in_months = utils.getDaysInMonth(planData.begin_year, planData.begin_month);
+
+  return days_in_months;
 }
 
 function checkRequestIsValid(posReq: laborModel.SavePositionRequest) {
@@ -141,6 +242,7 @@ function checkRequestIsValid(posReq: laborModel.SavePositionRequest) {
       if (!posReq.data.rate.annual && !posReq.data.rate.hourly) throw new Error("Must provide pay rate.");
       if (!(posReq.data.bonus_option in ["None", "Percent", "Value"])) throw new Error("Invalid Bonus option. Must be None, Percent or Value");
       if (posReq.data.bonus_option === "Value" && (!posReq.data.bonus || posReq.data.bonus.length !== 12)) throw new Error("Must provide bonus values!");
+      if (posReq.data.bonus_option === "Percent" && !posReq.data.bonus_pct) throw new Error("Must provide bonus percentage");
       if (!posReq.data.ftes || posReq.data.ftes.length !== 12) throw new Error("Must provide 12 months of FTEs");
     }
   } catch (error) {
@@ -156,20 +258,4 @@ function checkEntityLaborDefs(entityLabor: entityModel.laborCalcs) {
   } catch (error) {
     throw new Error(`Error occured in [checkEntityLaborCalcs]: ${error}`);
   }
-}
-
-export interface savePositionRequest {
-  action: "create" | "update" | "delete";
-  id?: string; //firstore document id
-  data?: {
-    acct: string;
-    dept: string;
-    pos: string;
-    status: "Salary" | "Hourly";
-    rate: { annual?: number; hourly?: number };
-    fte_factor: number;
-    bonus_option: "None" | "Percent" | "Value";
-    bonus?: laborCalc;
-    socialsec_pct: number;
-  };
 }
