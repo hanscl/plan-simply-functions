@@ -1,13 +1,9 @@
 import * as laborModel from "./labor_model";
 import * as utils from "./utils";
 
-export function calculateWages(posData: laborModel.PositionData, ftes: laborModel.laborCalc, wageMethod: string): laborModel.laborCalc | undefined {
-    if(wageMethod === "us")
-        return calculateWagesUS(posData, ftes);
-        
-}
 
-export function calculateWagesEU(posData: laborModel.PositionData, ftes: laborModel.laborCalc): laborModel.laborCalc {
+
+export function calculateWagesEU(posData: laborModel.PositionData, ftes: number[]): laborModel.laborCalc {
   try {
     // initialize wage data with zeroes
     const wages: laborModel.laborCalc = { total: 0, values: utils.getValuesArray() };
@@ -16,11 +12,11 @@ export function calculateWagesEU(posData: laborModel.PositionData, ftes: laborMo
 
     for (let mnth_idx = 0; mnth_idx < 12; mnth_idx++) {
       if (posData.status === "Salary" && posData.rate.annual !== undefined) {
-        wages.values[mnth_idx] = ftes.values[mnth_idx] * (posData.rate.annual / 12);
+        wages.values[mnth_idx] = ftes[mnth_idx] * (posData.rate.annual / 12);
         wages.total += wages.values[mnth_idx];
         wages.values[mnth_idx] = utils.finRound(wages.values[mnth_idx]);
       } else if (posData.status === "Hourly" && posData.fte_factor !== undefined && posData.rate.hourly !== undefined) {
-        wages.values[mnth_idx] = ((posData.fte_factor * posData.rate.hourly) / 12) * ftes.values[mnth_idx];
+        wages.values[mnth_idx] = ((posData.fte_factor * posData.rate.hourly) / 12) * ftes[mnth_idx];
         wages.total += wages.values[mnth_idx];
         wages.values[mnth_idx] = utils.finRound(wages.values[mnth_idx]);
       }
@@ -32,7 +28,7 @@ export function calculateWagesEU(posData: laborModel.PositionData, ftes: laborMo
   }
 }
 
-export function calculateWagesUS(posData: laborModel.PositionData, days_in_months: number[], ftes: laborModel.laborCalc): laborModel.laborCalc {
+export function calculateWagesUS(posData: laborModel.PositionData, days_in_months: number[], ftes: number[]): laborModel.laborCalc {
   try {
     const wages = { total: 0, values: utils.getValuesArray() };
 
@@ -45,12 +41,12 @@ export function calculateWagesUS(posData: laborModel.PositionData, days_in_month
     wages.total = 0;
     for (let mnth_idx = 0; mnth_idx < 12; mnth_idx++) {
       if (posData.status === "Salary" && posData.rate.annual !== undefined) {
-        wages.values[mnth_idx] = (days_in_months[mnth_idx] / days_in_year) * ftes.values[mnth_idx] * posData.rate.annual;
+        wages.values[mnth_idx] = (days_in_months[mnth_idx] / days_in_year) * ftes[mnth_idx] * posData.rate.annual;
         wages.total += wages.values[mnth_idx];
         wages.values[mnth_idx] = utils.finRound(wages.values[mnth_idx]);
         100;
       } else if (posData.status === "Hourly" && posData.fte_factor !== undefined && posData.rate.hourly !== undefined) {
-        wages.values[mnth_idx] = days_in_months[mnth_idx] * (posData.fte_factor / 52 / 7) * ftes.values[mnth_idx] * posData.rate.hourly;
+        wages.values[mnth_idx] = days_in_months[mnth_idx] * (posData.fte_factor / 52 / 7) * ftes[mnth_idx] * posData.rate.hourly;
         wages.total += wages.values[mnth_idx];
         wages.values[mnth_idx] = utils.finRound(wages.values[mnth_idx]);
       }

@@ -1,10 +1,12 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import * as https_utils from "./https_utils";
+import * as utils from "./utils";
 import * as config from "./config";
 import * as laborModel from "./labor_model";
 import * as laborCalc from "./labor_calc";
 import * as entityModel from "./entity_model";
+import * as planModel from "./plan_model";
 //import * as cloudTasks from "./gcloud_task_dispatch";
 
 const cors = require("cors")({ origin: true });
@@ -85,22 +87,43 @@ export const laborPositionRequest = functions.region(config.cloudFuncLoc).https.
 
 async function createLaborPosition(posReq: laborModel.SavePositionRequest, entityLaborDefs: entityModel.laborCalcs) {
   try {
-    // calculate wages
-    let wages = undefined;
-    const wages = () => {
+    // calculatye wages
+    const wages = await calculateWages(posReq, entityLaborDefs.wage_method);
+    if(!wages) throw new Error("Unable to calculate wages.");
 
-    }
-
-    if(entityLaborDefs.wage_method === "eu") 
-
-    const wages = laborCalc.calculateWagesEU();
     // calculate bonus
 
     // calculate social security
 
+    // calculate avg FTEs
+
     // save document
   } catch (error) {
     throw new Error(`Error in [createLaborPosition]: ${error}`);
+  }
+}
+
+async function calculateWages(
+  posReq: laborModel.SavePositionRequest,
+  wageMethod: string
+): Promise<laborModel.laborCalc | undefined> {
+  try {
+    if (posReq.data === undefined) throw new Error(`Position data is undefined`);
+
+    if (wageMethod === "us") {
+      // get the plan data for days in the month
+      const planDoc = await db.doc(`entities/${posReq.entityId}/plans/${posReq.planId}`).get();
+      if (!planDoc.exists) throw new Error(`Plan ${posReq.planId} does not exist for entity ${posReq.entityId}`);
+      const planData = planDoc.data() as planModel.planDoc;
+      const days_in_months = utils.getDaysInMonth(planData.begin_year, planData.begin_month);
+      return laborCalc.calculateWagesUS(posReq.data, days_in_months, posReq.data.ftes);
+    } else if (wageMethod === "eu") {
+      return laborCalc.calculateWagesEU(posReq.data, posReq.data.ftes);
+    } else {
+      return undefined;
+    }
+  } catch (error) {
+    throw new Error(`Error occured in [calculateWages]: ${error}`);
   }
 }
 
@@ -117,7 +140,8 @@ function checkRequestIsValid(posReq: laborModel.SavePositionRequest) {
       if (posReq.data.status !== "Hourly" && posReq.data.status !== "Salary") throw new Error("Invalid Wage Type. Must be Hourly or Salary.");
       if (!posReq.data.rate.annual && !posReq.data.rate.hourly) throw new Error("Must provide pay rate.");
       if (!(posReq.data.bonus_option in ["None", "Percent", "Value"])) throw new Error("Invalid Bonus option. Must be None, Percent or Value");
-      if (posReq.data.bonus_option === "Value" && !posReq.data.bonus) throw new Error("Must provide bonus values!");
+      if (posReq.data.bonus_option === "Value" && (!posReq.data.bonus || posReq.data.bonus.length !== 12)) throw new Error("Must provide bonus values!");
+      if (!posReq.data.ftes || posReq.data.ftes.length !== 12) throw new Error("Must provide 12 months of FTEs");
     }
   } catch (error) {
     throw new Error(`Invalid request to save labor: ${error}`);

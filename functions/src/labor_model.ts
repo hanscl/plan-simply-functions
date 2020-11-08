@@ -6,6 +6,7 @@ export interface laborVersionDoc {
 export interface SavePositionRequest {
   action: "create" | "update" | "delete";
   entityId: string;
+  planId: string;
   versionId: string;
   positionId?: string; //firstore document id
   data?: PositionData;
@@ -18,8 +19,9 @@ export interface PositionData {
   status: "Salary" | "Hourly";
   rate: { annual?: number; hourly?: number };
   fte_factor: number;
+  ftes: number[];
   bonus_option: "None" | "Percent" | "Value";
-  bonus?: laborCalc;
+  bonus?: number[];
   socialsec_pct: number;
 }
 
