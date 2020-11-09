@@ -101,7 +101,7 @@ export const laborEntryUpdate = functions.firestore
 
       const entity_doc = await db.doc(`entities/${context_params.entity_id}`).get();
       if (!entity_doc.exists) throw new Error(`no entity doc found for [entities/${context_params.entity_id}]`);
-      const entity_labor_calcs = (entity_doc.data() as entity_model.entityDoc).labor_calcs;
+      const entity_labor_calcs = (entity_doc.data() as entity_model.entityDoc).labor_settings;
       if(entity_labor_calcs === undefined) throw new Error(`Labor calcs do not exist on entity ${context_params.entity_id}`);
       const wage_method = entity_labor_calcs.wage_method;
       if (wage_method === "us") calculateWagesUS(pos_doc_after, days_in_months);

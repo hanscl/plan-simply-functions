@@ -7,7 +7,8 @@ import * as laborModel from "./labor_model";
 import * as laborCalc from "./labor_calc";
 import * as entityModel from "./entity_model";
 import * as planModel from "./plan_model";
-//import * as cloudTasks from "./gcloud_task_dispatch";
+import * as cloudTasks from "./gcloud_task_dispatch";
+import * as rollupRecalc from "./version_rollup_recalc_master";
 
 const cors = require("cors")({ origin: true });
 
@@ -59,14 +60,14 @@ export const laborPositionRequest = functions.region(config.cloudFuncLoc).https.
       // Get the labor calcs object from the entity
       const entityDoc = await db.doc(`entities/${laborPosRequest.entityId}`).get();
       if (!entityDoc.exists) throw new Error(`Entity document not found for ${laborPosRequest.entityId}`);
-      const entityLaborDefs = entityDoc.data() as entityModel.laborCalcs;
+      const entityLaborDefs = entityDoc.data() as entityModel.LaborSettings;
 
       checkEntityLaborDefs(entityLaborDefs);
 
       if (laborPosRequest.action === "create" || laborPosRequest.action === "update") {
         await createOrUpdateLaborPosition(laborPosRequest, entityLaborDefs);
       } else if (laborPosRequest.action === "delete" && laborPosRequest.positionId) {
-        await deleteLaborPosition(laborPosRequest.entityId, laborPosRequest.versionId, laborPosRequest.positionId);
+        await deleteLaborPosition(laborPosRequest, entityLaborDefs);
       } else
         throw new Error(
           `Unable to process request to save Labor position. Invalid action specified: '${laborPosRequest.action}'. Valid actions are 'create', 'update', 'save'`
@@ -83,15 +84,21 @@ export const laborPositionRequest = functions.region(config.cloudFuncLoc).https.
   });
 });
 
-async function deleteLaborPosition(entityId: string, versionId: string, positionId: string) {
+async function deleteLaborPosition(posReq: laborModel.SavePositionRequest, entityLaborDefs: entityModel.LaborSettings) {
   try {
-    await db.doc(`entities/${entityId}/labor/${versionId}/positions/${positionId}`).delete();
+    // begin transaction - lock the version document until we're done
+    await db.runTransaction(async (laborTx) => {
+      // update the income statement
+      await updateLaborAccounts(laborTx, posReq, utils.getValuesArray(), utils.getValuesArray(), utils.getValuesArray(), entityLaborDefs.default_accts);
+      // save document
+      laborTx.delete(db.doc(`entities/${posReq.entityId}/labor/${posReq.versionId}/positions/${posReq.positionId}`));
+    });
   } catch (error) {
     throw new Error(`Error in [deleteLaborPosition]: ${error}`);
   }
 }
 
-async function createOrUpdateLaborPosition(posReq: laborModel.SavePositionRequest, entityLaborDefs: entityModel.laborCalcs) {
+async function createOrUpdateLaborPosition(posReq: laborModel.SavePositionRequest, entityLaborDefs: entityModel.LaborSettings) {
   try {
     if (!posReq.data) throw new Error("No data to create new position");
 
@@ -111,24 +118,93 @@ async function createOrUpdateLaborPosition(posReq: laborModel.SavePositionReques
     // calculate avg FTEs
     const ftes = laborCalc.calculateAvgFTEs(daysInMonths, posReq.data.ftes);
 
-    // 1. get old values & lock document in tx
-    // for (wages, bonus, socialsec)
-    // 2. calculate difference
-    // 3. schedule cloud task
-    // save document & end tx
-
-   // create this comparison -> use cloud task cause this could take a few seconds ...
-   await cloudTasks.dispatchGCloudTask({ ...compParams, userId: uid } as compModel.VersionCompWithUser, "process-version-comparison", "general");
-
-
-    // save document
-    savePosition(posReq, wages, bonus, socialsec, ftes);
+    // begin transaction - lock the version document until we're done
+    await db.runTransaction(async (laborTx) => {
+      // update the income statement
+      await updateLaborAccounts(laborTx, posReq, wages.values, bonus.values, socialsec.values, entityLaborDefs.default_accts);
+      // save document
+      await savePosition(laborTx, posReq, wages, bonus, socialsec, ftes);
+    });
   } catch (error) {
     throw new Error(`Error in [createLaborPosition]: ${error}`);
   }
 }
 
+async function updateLaborAccounts(
+  laborTx: FirebaseFirestore.Transaction,
+  posReq: laborModel.SavePositionRequest,
+  wagesAfter: number[],
+  bonusAfter: number[],
+  socialsecAfter: number[],
+  laborAccts: entityModel.LaborDefaultAccounts
+) {
+  try {
+    if (!posReq.data) throw new Error("Need position data to update accounts");
+
+    let wagesBefore = utils.getValuesArray();
+    let bonusBefore = utils.getValuesArray();
+    let socialsecBefore = utils.getValuesArray();
+
+    // get the existing values unless we are creating a new position
+    if ((posReq.action === "delete" || posReq.action === "update") && posReq.positionId) {
+      const positionDoc = await laborTx.get(db.doc(`entities/${posReq.entityId}/labor/${posReq.versionId}/positions/${posReq.positionId}`));
+      if (!positionDoc) throw new Error(`Position document ${posReq.positionId} not found for version ${posReq.versionId}`);
+      // we have a position -- get the existing calculated values
+      const laborData = positionDoc.data() as laborModel.PositionDoc;
+      wagesBefore = laborData.wages.values;
+      bonusBefore = laborData.bonus.values;
+      socialsecBefore = laborData.socialsec.values;
+    }
+
+    // calc the difference & schedule a cloud task for each
+    await scheduleCloudTaskRecalc(posReq, posReq.data.acct, wagesBefore, wagesAfter);
+    await scheduleCloudTaskRecalc(posReq, laborAccts.bonus, bonusBefore, bonusAfter);
+    await scheduleCloudTaskRecalc(posReq, laborAccts.socialsec, socialsecBefore, socialsecAfter);
+  } catch (error) {
+    throw new Error(`Error in [updateLaborAccounts]: ${error}`);
+  }
+}
+
+async function scheduleCloudTaskRecalc(posReq: laborModel.SavePositionRequest, acctId: string, valsBefore: number[], valsAfter: number[]) {
+  try {
+    if (!posReq.data) throw new Error("Need position data to execute recalc request");
+
+    const acctChanges = {
+      diff_by_month: [],
+      diff_total: 0,
+      months_changed: [],
+      operation: 1,
+    };
+
+    const ret = utils.getValueDiffsByMonth(valsBefore, valsAfter, acctChanges.diff_by_month, acctChanges.months_changed);
+    if (!ret) throw new Error("Unable to calculate difference in values");
+
+    acctChanges.diff_total = ret;
+
+    // create the recalc request object
+    const recalcReq: rollupRecalc.RecalcRequest = {
+      caller_id: "labor",
+      user_initiated: false,
+      recalc_params: {
+        acct_id: posReq.data.acct,
+        entity_id: posReq.entityId,
+        plan_id: posReq.planId,
+        version_id: posReq.versionId,
+        dept: posReq.data.dept,
+        values: [],
+      },
+      passed_acct_changes: acctChanges,
+    };
+
+    // schedule the cloud task
+    await cloudTasks.dispatchGCloudTask(recalcReq, "version-rollup-recalc", "recalc");
+  } catch (error) {
+    throw new Error(`Error occured in [scheduleCloudTaskRecalc]: ${error}`);
+  }
+}
+
 async function savePosition(
+  laborTx: FirebaseFirestore.Transaction,
   posReq: laborModel.SavePositionRequest,
   wages: laborModel.laborCalc,
   bonus: laborModel.laborCalc,
@@ -162,9 +238,9 @@ async function savePosition(
 
     // & save
     if (posReq.positionId) {
-      await laborDocRef.collection("positions").doc(posReq.positionId).set(laborDoc);
+      laborTx.set(laborDocRef.collection("positions").doc(posReq.positionId), laborDoc);
     } else {
-      await laborDocRef.collection("positions").add(laborDoc);
+      laborTx.set(laborDocRef.collection("positions").doc(), laborDoc);
     }
   } catch (error) {
     throw new Error(`Error in [savePosition]: ${error}`);
@@ -250,7 +326,7 @@ function checkRequestIsValid(posReq: laborModel.SavePositionRequest) {
   }
 }
 
-function checkEntityLaborDefs(entityLabor: entityModel.laborCalcs) {
+function checkEntityLaborDefs(entityLabor: entityModel.LaborSettings) {
   try {
     if (!entityLabor.wage_method || !["us", "eu"].includes(entityLabor.wage_method)) throw new Error("No valid wage method defined for entity");
     if (!entityLabor.default_accts || !entityLabor.default_accts.bonus || !entityLabor.default_accts.socialsec)
