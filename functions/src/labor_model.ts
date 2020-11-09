@@ -29,12 +29,12 @@ export interface PositionData {
 }
 
 export interface PositionDoc {
+  comments: string;
   acct: string;
   dept: string;
   div: string; 
   pos: string;
-  wage_type: "Salary" | "Hourly";
-  status?: "Salary" | "Hourly"; // TODO: REMOVE WHEN PROD POSITIONS HAVE BEEN UPDATED
+  pay_type: "Salary" | "Hourly";
   rate: rateMap;
   fte_factor: number;
   bonus_option: "None" | "Percent" | "Value";

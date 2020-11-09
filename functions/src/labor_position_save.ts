@@ -60,7 +60,9 @@ export const laborPositionRequest = functions.region(config.cloudFuncLoc).https.
       // Get the labor calcs object from the entity
       const entityDoc = await db.doc(`entities/${laborPosRequest.entityId}`).get();
       if (!entityDoc.exists) throw new Error(`Entity document not found for ${laborPosRequest.entityId}`);
-      const entityLaborDefs = entityDoc.data() as entityModel.LaborSettings;
+      const entityData = entityDoc.data() as entityModel.entityDoc;
+      const entityLaborDefs = entityData.labor_settings
+      if(!entityLaborDefs) throw new Error("Missing Labor Settings on Entity");
 
       checkEntityLaborDefs(entityLaborDefs);
 
@@ -219,11 +221,12 @@ async function savePosition(
 
     // create the document
     const laborDoc: laborModel.PositionDoc = {
+      comments: "",
       acct: posReq.data.acct,
       dept: posReq.data.dept,
       div: await getPositionDiv(posReq.entityId, posReq.data.dept),
       pos: posReq.data.pos,
-      wage_type: posReq.data.status,
+      pay_type: posReq.data.status,
       fte_factor: posReq.data.fte_factor,
       ftes: ftes,
       rate: laborCalc.calculateRate(posReq.data),

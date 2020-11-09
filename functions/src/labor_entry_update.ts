@@ -63,7 +63,7 @@ export const laborEntryUpdate = functions.firestore
       // Exit function if any required values are missing
       if (
         pos_doc_after.rate === undefined ||
-        pos_doc_after.wage_type === undefined ||
+        pos_doc_after.pay_type === undefined ||
         pos_doc_after.ftes === undefined ||
         pos_doc_after.fte_factor === undefined
       ) {
@@ -81,11 +81,11 @@ export const laborEntryUpdate = functions.firestore
           pos_doc_before.fte_factor === pos_doc_after.fte_factor &&
           JSON.stringify(pos_doc_before.ftes?.values) === JSON.stringify(pos_doc_after.ftes?.values) &&
           pos_doc_before.pos === pos_doc_after.pos &&
-          pos_doc_before.wage_type === pos_doc_after.wage_type
+          pos_doc_before.pay_type === pos_doc_after.pay_type
         ) {
           if (
-            (pos_doc_after.wage_type === "Hourly" && pos_doc_before.rate !== undefined && pos_doc_before.rate.hourly === pos_doc_after.rate.hourly) ||
-            (pos_doc_after.wage_type === "Salary" && pos_doc_before.rate !== undefined && pos_doc_before.rate.annual === pos_doc_after.rate.annual)
+            (pos_doc_after.pay_type === "Hourly" && pos_doc_before.rate !== undefined && pos_doc_before.rate.hourly === pos_doc_after.rate.hourly) ||
+            (pos_doc_after.pay_type === "Salary" && pos_doc_before.rate !== undefined && pos_doc_before.rate.annual === pos_doc_after.rate.annual)
           ) {
             console.log(`All input values are unchanged. Exit`);
             return;
@@ -155,19 +155,19 @@ function calculateWagesEU(position: labor_model.PositionDoc) {
     console.log(`trying to calculate wages without a rate`);
     return;
   }
-  if (position.wage_type === "Hourly" && position.fte_factor === undefined) {
+  if (position.pay_type === "Hourly" && position.fte_factor === undefined) {
     console.log(`trying to calculate hourly wages without an FTE factor `);
     return;
   }
 
   position.wages.total = 0;
   for (let mnth_idx = 0; mnth_idx < 12; mnth_idx++) {
-    if (position.wage_type === "Salary" && position.rate.annual !== undefined) {
+    if (position.pay_type === "Salary" && position.rate.annual !== undefined) {
       position.wages.values[mnth_idx] = position.ftes.values[mnth_idx] * (position.rate.annual / 12);
       position.wages.total += position.wages.values[mnth_idx];
       position.wages.values[mnth_idx] = utils.finRound(position.wages.values[mnth_idx]);
       100;
-    } else if (position.wage_type === "Hourly" && position.fte_factor !== undefined && position.rate.hourly !== undefined) {
+    } else if (position.pay_type === "Hourly" && position.fte_factor !== undefined && position.rate.hourly !== undefined) {
       position.wages.values[mnth_idx] = (position.fte_factor * position.rate.hourly) / 12 * position.ftes.values[mnth_idx];
       position.wages.total += position.wages.values[mnth_idx];
       position.wages.values[mnth_idx] = utils.finRound(position.wages.values[mnth_idx]);
@@ -189,7 +189,7 @@ function calculateWagesUS(position: labor_model.PositionDoc, days_in_months: num
     console.log(`trying to calculate wages without a rate`);
     return;
   }
-  if (position.wage_type === "Hourly" && position.fte_factor === undefined) {
+  if (position.pay_type === "Hourly" && position.fte_factor === undefined) {
     console.log(`trying to calculate hourly wages without an FTE factor `);
     return;
   }
@@ -198,12 +198,12 @@ function calculateWagesUS(position: labor_model.PositionDoc, days_in_months: num
   }, 0);
   position.wages.total = 0;
   for (let mnth_idx = 0; mnth_idx < 12; mnth_idx++) {
-    if (position.wage_type === "Salary" && position.rate.annual !== undefined) {
+    if (position.pay_type === "Salary" && position.rate.annual !== undefined) {
       position.wages.values[mnth_idx] = (days_in_months[mnth_idx] / days_in_year) * position.ftes.values[mnth_idx] * position.rate.annual;
       position.wages.total += position.wages.values[mnth_idx];
       position.wages.values[mnth_idx] = utils.finRound(position.wages.values[mnth_idx]);
       100;
-    } else if (position.wage_type === "Hourly" && position.fte_factor !== undefined && position.rate.hourly !== undefined) {
+    } else if (position.pay_type === "Hourly" && position.fte_factor !== undefined && position.rate.hourly !== undefined) {
       position.wages.values[mnth_idx] = days_in_months[mnth_idx] * (position.fte_factor / 52 / 7) * position.ftes.values[mnth_idx] * position.rate.hourly;
       position.wages.total += position.wages.values[mnth_idx];
       position.wages.values[mnth_idx] = utils.finRound(position.wages.values[mnth_idx]);
@@ -230,9 +230,9 @@ function calculateAvgFTEs(days_in_months: number[], ftes: labor_model.laborCalc)
 function calculateRate(position: labor_model.PositionDoc) {
   if (position.rate === undefined || position.fte_factor === undefined) return;
 
-  if (position.wage_type === "Hourly" && position.rate.hourly !== undefined) {
+  if (position.pay_type === "Hourly" && position.rate.hourly !== undefined) {
     position.rate.annual = utils.finRound(position.rate.hourly * position.fte_factor);
-  } else if (position.wage_type === "Salary" && position.rate.annual !== undefined) {
+  } else if (position.pay_type === "Salary" && position.rate.annual !== undefined) {
     position.rate.hourly = utils.finRound(position.rate.annual / position.fte_factor);
   }
   console.log(`calculate Rate complete`);
