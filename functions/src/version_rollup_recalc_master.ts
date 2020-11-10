@@ -120,7 +120,7 @@ async function isUpdatedAllowed(recalc_params: recalcParams, acct_list: plan_mod
     console.log(`Version editing allowed for ${recalc_params.entity_id}:${recalc_params.version_id}:${recalc_params.acct_id}`);
     return true;
   } catch (error) {
-    console.log(`Error occurred while checking if udpate is allowed`);
+    console.log(`Error occurred while checking if udpate is allowed: ${error}`);
     return false;
   }
 }

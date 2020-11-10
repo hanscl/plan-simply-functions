@@ -61,8 +61,8 @@ export const laborPositionRequest = functions.region(config.cloudFuncLoc).https.
       const entityDoc = await db.doc(`entities/${laborPosRequest.entityId}`).get();
       if (!entityDoc.exists) throw new Error(`Entity document not found for ${laborPosRequest.entityId}`);
       const entityData = entityDoc.data() as entityModel.entityDoc;
-      const entityLaborDefs = entityData.labor_settings
-      if(!entityLaborDefs) throw new Error("Missing Labor Settings on Entity");
+      const entityLaborDefs = entityData.labor_settings;
+      if (!entityLaborDefs) throw new Error("Missing Labor Settings on Entity");
 
       checkEntityLaborDefs(entityLaborDefs);
 
@@ -141,36 +141,76 @@ async function updateLaborAccounts(
   laborAccts: entityModel.LaborDefaultAccounts
 ) {
   try {
-    if (!posReq.data) throw new Error("Need position data to update accounts");
+    if (posReq.action !== "delete" && !posReq.data) throw new Error("Need position data to update accounts");
 
     let wagesBefore = utils.getValuesArray();
     let bonusBefore = utils.getValuesArray();
     let socialsecBefore = utils.getValuesArray();
+
+    let positionData: laborModel.PositionDoc | undefined = undefined;
 
     // get the existing values unless we are creating a new position
     if ((posReq.action === "delete" || posReq.action === "update") && posReq.positionId) {
       const positionDoc = await laborTx.get(db.doc(`entities/${posReq.entityId}/labor/${posReq.versionId}/positions/${posReq.positionId}`));
       if (!positionDoc) throw new Error(`Position document ${posReq.positionId} not found for version ${posReq.versionId}`);
       // we have a position -- get the existing calculated values
-      const laborData = positionDoc.data() as laborModel.PositionDoc;
-      wagesBefore = laborData.wages.values;
-      bonusBefore = laborData.bonus.values;
-      socialsecBefore = laborData.socialsec.values;
+      positionData = positionDoc.data() as laborModel.PositionDoc;
+      wagesBefore = positionData.wages.values;
+      bonusBefore = positionData.bonus.values;
+      socialsecBefore = positionData.socialsec.values;
     }
 
-    // calc the difference & schedule a cloud task for each
-    await scheduleCloudTaskRecalc(posReq, posReq.data.acct, wagesBefore, wagesAfter);
-    await scheduleCloudTaskRecalc(posReq, laborAccts.bonus, bonusBefore, bonusAfter);
-    await scheduleCloudTaskRecalc(posReq, laborAccts.socialsec, socialsecBefore, socialsecAfter);
+    // get the entity doc and pass to the recalc function
+    const entityDoc = await db.doc(`entities/${posReq.entityId}`).get();
+    const entityData = entityDoc.data() as entityModel.entityDoc;
+
+    let newPosDiv = "";
+    if(posReq.action !== "delete" && posReq.data)
+      newPosDiv = await getPositionDiv(posReq.entityId, posReq.data.dept);
+
+    // TODO: optimize this code, please
+    if (posReq.action === "delete") {
+      if (!positionData) throw new Error("Unable to locate position to be deleted");
+      await scheduleCloudTaskRecalc(entityData, posReq, positionData.acct, positionData.dept,positionData.div, wagesBefore, wagesAfter);
+      await scheduleCloudTaskRecalc(entityData, posReq, laborAccts.bonus, positionData.dept, positionData.div,bonusBefore, bonusAfter);
+      await scheduleCloudTaskRecalc(entityData, posReq, laborAccts.socialsec, positionData.dept, positionData.div,socialsecBefore, socialsecAfter);
+    } else if (posReq.action === "create") {
+      if (!posReq.data) throw new Error("Need data object to create position");
+      await scheduleCloudTaskRecalc(entityData, posReq, posReq.data.acct, posReq.data.dept, newPosDiv, wagesBefore, wagesAfter);
+      await scheduleCloudTaskRecalc(entityData, posReq, laborAccts.bonus, posReq.data.dept, newPosDiv, bonusBefore, bonusAfter);
+      await scheduleCloudTaskRecalc(entityData, posReq, laborAccts.socialsec, posReq.data.dept, newPosDiv, socialsecBefore, socialsecAfter);
+    } else {
+      if (!positionData || !posReq.data) throw new Error("Need existing position and data object to update position");
+      if (posReq.data.dept !== positionData.dept) {
+        // delete values from previous account
+        await scheduleCloudTaskRecalc(entityData, posReq, positionData.acct, positionData.dept, positionData.div, wagesBefore, utils.getValuesArray());
+        await scheduleCloudTaskRecalc(entityData, posReq, laborAccts.bonus, positionData.dept, positionData.div,bonusBefore, utils.getValuesArray());
+        await scheduleCloudTaskRecalc(entityData, posReq, laborAccts.socialsec, positionData.dept, positionData.div,socialsecBefore, utils.getValuesArray());
+        // add values to new account
+        await scheduleCloudTaskRecalc(entityData, posReq, posReq.data.acct, posReq.data.dept, newPosDiv, utils.getValuesArray(), wagesAfter);
+        await scheduleCloudTaskRecalc(entityData, posReq, laborAccts.bonus, posReq.data.dept, newPosDiv, utils.getValuesArray(), bonusAfter);
+        await scheduleCloudTaskRecalc(entityData, posReq, laborAccts.socialsec, posReq.data.dept, newPosDiv, utils.getValuesArray(), socialsecAfter);
+      } else if (posReq.data.acct !== positionData.acct) {
+        // new wage account only -- process both
+        await scheduleCloudTaskRecalc(entityData, posReq, positionData.acct, positionData.dept, positionData.div, wagesBefore, utils.getValuesArray());
+        await scheduleCloudTaskRecalc(entityData, posReq, posReq.data.acct, posReq.data.dept,newPosDiv, utils.getValuesArray(), wagesAfter);
+        // for bonus & social sec just update the existing account
+        await scheduleCloudTaskRecalc(entityData, posReq, laborAccts.bonus, posReq.data.dept, newPosDiv, bonusBefore, bonusAfter);
+        await scheduleCloudTaskRecalc(entityData, posReq, laborAccts.socialsec, posReq.data.dept, newPosDiv, socialsecBefore, socialsecAfter);
+      } else {
+        // all three accounts and the dept are the same. Just update those accounts
+        await scheduleCloudTaskRecalc(entityData, posReq, posReq.data.acct, posReq.data.dept, newPosDiv, wagesBefore, wagesAfter);
+        await scheduleCloudTaskRecalc(entityData, posReq, laborAccts.bonus, posReq.data.dept, newPosDiv, bonusBefore, bonusAfter);
+        await scheduleCloudTaskRecalc(entityData, posReq, laborAccts.socialsec, posReq.data.dept, newPosDiv, socialsecBefore, socialsecAfter);
+      }
+    }
   } catch (error) {
     throw new Error(`Error in [updateLaborAccounts]: ${error}`);
   }
 }
 
-async function scheduleCloudTaskRecalc(posReq: laborModel.SavePositionRequest, acctId: string, valsBefore: number[], valsAfter: number[]) {
+async function scheduleCloudTaskRecalc(entityData: entityModel.entityDoc, posReq: laborModel.SavePositionRequest, acctId: string, deptId: string, divId: string, valsBefore: number[], valsAfter: number[]) {
   try {
-    if (!posReq.data) throw new Error("Need position data to execute recalc request");
-
     const acctChanges = {
       diff_by_month: [],
       diff_total: 0,
@@ -178,25 +218,42 @@ async function scheduleCloudTaskRecalc(posReq: laborModel.SavePositionRequest, a
       operation: 1,
     };
 
+    console.log(
+      `[BEFORE]: ValsBefore: ${JSON.stringify(valsBefore)}, valsAfter: ${JSON.stringify(valsAfter)}, acctChanges: ${JSON.stringify(acctChanges)}`
+    );
+
+    console.log(`[posReq]: ${JSON.stringify(posReq)}`);
+
     const ret = utils.getValueDiffsByMonth(valsBefore, valsAfter, acctChanges.diff_by_month, acctChanges.months_changed);
-    if (!ret) throw new Error("Unable to calculate difference in values");
+    if (ret === undefined) {
+      console.log(
+        `[AFTER]: ValsBefore: ${JSON.stringify(valsBefore)}, valsAfter: ${JSON.stringify(valsAfter)}, acctChanges: ${JSON.stringify(acctChanges)}`
+      );
+      throw new Error("Unable to calculate difference in values");
+    }
 
     acctChanges.diff_total = ret;
+
+    // build the full account   
+    const fullAcct = utils.buildFullAccountString([entityData.full_account], {acct: acctId, div: divId,dept: deptId });
+    console.log(`Full account: ${fullAcct}`);
 
     // create the recalc request object
     const recalcReq: rollupRecalc.RecalcRequest = {
       caller_id: "labor",
       user_initiated: false,
       recalc_params: {
-        acct_id: posReq.data.acct,
+        acct_id: fullAcct,
+        dept: deptId,
         entity_id: posReq.entityId,
         plan_id: posReq.planId,
         version_id: posReq.versionId,
-        dept: posReq.data.dept,
         values: [],
       },
       passed_acct_changes: acctChanges,
     };
+
+    console.log(`recalc Request: ${JSON.stringify(recalcReq)}`);
 
     // schedule the cloud task
     await cloudTasks.dispatchGCloudTask(recalcReq, "version-rollup-recalc", "recalc");
@@ -208,10 +265,10 @@ async function scheduleCloudTaskRecalc(posReq: laborModel.SavePositionRequest, a
 async function savePosition(
   laborTx: FirebaseFirestore.Transaction,
   posReq: laborModel.SavePositionRequest,
-  wages: laborModel.laborCalc,
-  bonus: laborModel.laborCalc,
-  socialsec: laborModel.laborCalc,
-  ftes: laborModel.laborCalc
+  wages: laborModel.LaborCalc,
+  bonus: laborModel.LaborCalc,
+  socialsec: laborModel.LaborCalc,
+  ftes: laborModel.LaborCalc
 ) {
   try {
     if (!posReq.data) throw new Error("Must have position data for saving document");
@@ -225,8 +282,8 @@ async function savePosition(
       acct: posReq.data.acct,
       dept: posReq.data.dept,
       div: await getPositionDiv(posReq.entityId, posReq.data.dept),
-      pos: posReq.data.pos,
-      pay_type: posReq.data.status,
+      title: posReq.data.title,
+      pay_type: posReq.data.pay_type,
       fte_factor: posReq.data.fte_factor,
       ftes: ftes,
       rate: laborCalc.calculateRate(posReq.data),
@@ -268,7 +325,7 @@ async function createVersionLaborDoc(posReq: laborModel.SavePositionRequest): Pr
     const laborDocRef = db.doc(`entities/${posReq.entityId}/labor/${posReq.versionId}`);
 
     // see if the document exists already
-    let versionLaborDoc = await laborDocRef.get();
+    const versionLaborDoc = await laborDocRef.get();
     if (!versionLaborDoc.exists) {
       await laborDocRef.set({
         plan_id: posReq.planId,
@@ -282,7 +339,7 @@ async function createVersionLaborDoc(posReq: laborModel.SavePositionRequest): Pr
   }
 }
 
-function getWages(posReq: laborModel.SavePositionRequest, wageMethod: string, daysInMonths: number[]): laborModel.laborCalc | undefined {
+function getWages(posReq: laborModel.SavePositionRequest, wageMethod: string, daysInMonths: number[]): laborModel.LaborCalc | undefined {
   try {
     if (posReq.data === undefined) throw new Error(`Position data is undefined`);
 
@@ -316,10 +373,10 @@ function checkRequestIsValid(posReq: laborModel.SavePositionRequest) {
     // data object validations are only required for create and update requests
     if (posReq.action !== "delete") {
       if (!posReq.data) throw new Error("Position data required for update and create requests.");
-      if (!posReq.data.acct || !posReq.data.dept || !posReq.data.pos) throw new Error("Acct/Dept/Title are required for update and create requests.");
-      if (posReq.data.status !== "Hourly" && posReq.data.status !== "Salary") throw new Error("Invalid Wage Type. Must be Hourly or Salary.");
+      if (!posReq.data.acct || !posReq.data.dept || !posReq.data.title) throw new Error("Acct/Dept/Title are required for update and create requests.");
+      if (posReq.data.pay_type !== "Hourly" && posReq.data.pay_type !== "Salary") throw new Error("Invalid Wage Type. Must be Hourly or Salary.");
       if (!posReq.data.rate.annual && !posReq.data.rate.hourly) throw new Error("Must provide pay rate.");
-      if (!(posReq.data.bonus_option in ["None", "Percent", "Value"])) throw new Error("Invalid Bonus option. Must be None, Percent or Value");
+      if (!(["None", "Percent", "Value"].includes(posReq.data.bonus_option))) throw new Error("Invalid Bonus option. Must be None, Percent or Value");
       if (posReq.data.bonus_option === "Value" && (!posReq.data.bonus || posReq.data.bonus.length !== 12)) throw new Error("Must provide bonus values!");
       if (posReq.data.bonus_option === "Percent" && !posReq.data.bonus_pct) throw new Error("Must provide bonus percentage");
       if (!posReq.data.ftes || posReq.data.ftes.length !== 12) throw new Error("Must provide 12 months of FTEs");

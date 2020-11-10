@@ -17,9 +17,9 @@ export interface SavePositionRequest {
 export interface PositionData {
   acct: string;
   dept: string;
-  pos: string;
-  status: "Salary" | "Hourly";
-  rate: { annual?: number; hourly?: number };
+  title: string;
+  pay_type: "Salary" | "Hourly";
+  rate: RateMap;
   fte_factor: number;
   ftes: number[];
   bonus_option: "None" | "Percent" | "Value";
@@ -33,26 +33,26 @@ export interface PositionDoc {
   acct: string;
   dept: string;
   div: string; 
-  pos: string;
+  title: string;
   pay_type: "Salary" | "Hourly";
-  rate: rateMap;
+  rate: RateMap;
   fte_factor: number;
   bonus_option: "None" | "Percent" | "Value";
-  bonus: laborCalc;
+  bonus: LaborCalc;
   bonus_pct: number;
-  wages: laborCalc;
-  ftes: laborCalc;
+  wages: LaborCalc;
+  ftes: LaborCalc;
   socialsec_pct: number;
-  socialsec: laborCalc;
+  socialsec: LaborCalc;
   last_updated: admin.firestore.Timestamp;
 }
 
-export interface rateMap {
-  annual: number;
-  hourly: number;
+export interface RateMap {
+  annual?: number;
+  hourly?: number;
 }
 
-export interface laborCalc {
+export interface LaborCalc {
   total: number;
   values: number[];
 }

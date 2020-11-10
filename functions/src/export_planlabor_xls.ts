@@ -200,12 +200,12 @@ async function createLaborXls(report_params: export_model.reportRequest, xls_she
     for (const pos_doc of labor_snap.docs) {
       const position = pos_doc.data() as labor_model.PositionDoc;
       console.log(`Exporting Position ${pos_doc.id}: ${JSON.stringify(position)} into XLS row ...`);
-      if (position.acct === undefined || position.dept === undefined || position.status === undefined || position.pos === undefined) continue;
+      if (position.acct === undefined || position.dept === undefined || position.pay_type === undefined || position.title === undefined) continue;
 
       xls_sheet.cell(row_ctr, 1).string(position.dept).style(xls_style);
       xls_sheet.cell(row_ctr, 2).string(position.acct).style(xls_style);
-      xls_sheet.cell(row_ctr, 3).string(position.pos).style(xls_style);
-      xls_sheet.cell(row_ctr, 4).string(position.status).style(xls_style);
+      xls_sheet.cell(row_ctr, 3).string(position.title).style(xls_style);
+      xls_sheet.cell(row_ctr, 4).string(position.pay_type).style(xls_style);
       if (position.rate?.hourly !== undefined && typeof position.rate?.hourly === "number")
         xls_sheet.cell(row_ctr, 5).number(position.rate?.hourly).style(xls_style);
       if (position.rate?.annual !== undefined && typeof position.rate?.annual === "number")

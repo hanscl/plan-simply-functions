@@ -9,7 +9,7 @@ export interface entityDoc {
   acct_type_flip_sign?: string[];
   type: string;
   entity_embeds?: entityEmbed[];
-  labor_settings?: LaborSettings;
+  labor_settings: LaborSettings;
 }
 
 export interface LaborSettings {

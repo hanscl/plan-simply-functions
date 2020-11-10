@@ -16,7 +16,7 @@ interface contextParams {
 }
 
 export const laborEntryUpdate = functions.firestore
-  .document("entities/{entityId}/labor/{versionId}/positions/{positionId}")
+  .document("entities/{entityId}/labor/{versionId}/positions/TEST123")
   .onWrite(async (snapshot, context) => {
     try {
       const context_params: contextParams = {
@@ -80,7 +80,7 @@ export const laborEntryUpdate = functions.firestore
           pos_doc_before.dept === pos_doc_after.dept &&
           pos_doc_before.fte_factor === pos_doc_after.fte_factor &&
           JSON.stringify(pos_doc_before.ftes?.values) === JSON.stringify(pos_doc_after.ftes?.values) &&
-          pos_doc_before.pos === pos_doc_after.pos &&
+          pos_doc_before.title === pos_doc_after.title &&
           pos_doc_before.pay_type === pos_doc_after.pay_type
         ) {
           if (
@@ -213,7 +213,7 @@ function calculateWagesUS(position: labor_model.PositionDoc, days_in_months: num
   console.log(`wage calc complete`);
 }
 
-function calculateAvgFTEs(days_in_months: number[], ftes: labor_model.laborCalc) {
+function calculateAvgFTEs(days_in_months: number[], ftes: labor_model.LaborCalc) {
   const days_in_year = days_in_months.reduce((a, b) => {
     return a + b;
   }, 0);
