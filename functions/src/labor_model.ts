@@ -1,4 +1,4 @@
-import * as admin from "firebase-admin";
+import * as admin from 'firebase-admin';
 
 export interface laborVersionDoc {
   plan_id: string;
@@ -6,7 +6,7 @@ export interface laborVersionDoc {
 }
 
 export interface SavePositionRequest {
-  action: "create" | "update" | "delete";
+  action: 'create' | 'update' | 'delete';
   entityId: string;
   planId: string;
   versionId: string;
@@ -18,13 +18,13 @@ export interface PositionData {
   acct: string;
   dept: string;
   title: string;
-  pay_type: "Salary" | "Hourly";
+  pay_type: 'Salary' | 'Hourly';
   rate: RateMap;
   fte_factor: number;
-  ftes: number[];
-  bonus_option: "None" | "Percent" | "Value";
+  ftes: LaborCalc;
+  bonus_option: 'None' | 'Percent' | 'Value';
   bonus_pct?: number;
-  bonus?: number[];
+  bonus?: LaborCalc;
   socialsec_pct: number;
 }
 
@@ -32,12 +32,12 @@ export interface PositionDoc {
   comments: string;
   acct: string;
   dept: string;
-  div: string; 
+  div: string;
   title: string;
-  pay_type: "Salary" | "Hourly";
+  pay_type: 'Salary' | 'Hourly';
   rate: RateMap;
   fte_factor: number;
-  bonus_option: "None" | "Percent" | "Value";
+  bonus_option: 'None' | 'Percent' | 'Value';
   bonus: LaborCalc;
   bonus_pct: number;
   wages: LaborCalc;

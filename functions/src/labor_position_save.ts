@@ -118,7 +118,7 @@ async function createOrUpdateLaborPosition(posReq: laborModel.SavePositionReques
     const socialsec = laborCalc.calculateSocialSec(posReq.data, wages.values);
 
     // calculate avg FTEs
-    const ftes = laborCalc.calculateAvgFTEs(daysInMonths, posReq.data.ftes);
+    const ftes = laborCalc.calculateAvgFTEs(daysInMonths, posReq.data.ftes.values);
 
     // begin transaction - lock the version document until we're done
     await db.runTransaction(async (laborTx) => {
@@ -276,6 +276,8 @@ async function savePosition(
     // make sure the labor document exists for this version
     const laborDocRef = await createVersionLaborDoc(posReq);
 
+    console.log(`Writing Labor request: ${JSON.stringify(posReq)}`);
+
     // create the document
     const laborDoc: laborModel.PositionDoc = {
       comments: "",
@@ -296,6 +298,8 @@ async function savePosition(
       last_updated: admin.firestore.Timestamp.now(),
     };
 
+    console.log(`Labor Doc before save: ${JSON.stringify(laborDoc)}`);
+    
     // & save
     if (posReq.positionId) {
       laborTx.set(laborDocRef.collection("positions").doc(posReq.positionId), laborDoc);
@@ -344,9 +348,9 @@ function getWages(posReq: laborModel.SavePositionRequest, wageMethod: string, da
     if (posReq.data === undefined) throw new Error(`Position data is undefined`);
 
     if (wageMethod === "us") {
-      return laborCalc.calculateWagesUS(posReq.data, daysInMonths, posReq.data.ftes);
+      return laborCalc.calculateWagesUS(posReq.data, daysInMonths, posReq.data.ftes.values);
     } else if (wageMethod === "eu") {
-      return laborCalc.calculateWagesEU(posReq.data, posReq.data.ftes);
+      return laborCalc.calculateWagesEU(posReq.data, posReq.data.ftes.values);
     } else {
       return undefined;
     }
@@ -377,9 +381,9 @@ function checkRequestIsValid(posReq: laborModel.SavePositionRequest) {
       if (posReq.data.pay_type !== "Hourly" && posReq.data.pay_type !== "Salary") throw new Error("Invalid Wage Type. Must be Hourly or Salary.");
       if (!posReq.data.rate.annual && !posReq.data.rate.hourly) throw new Error("Must provide pay rate.");
       if (!(["None", "Percent", "Value"].includes(posReq.data.bonus_option))) throw new Error("Invalid Bonus option. Must be None, Percent or Value");
-      if (posReq.data.bonus_option === "Value" && (!posReq.data.bonus || posReq.data.bonus.length !== 12)) throw new Error("Must provide bonus values!");
+      if (posReq.data.bonus_option === "Value" && (!posReq.data.bonus || posReq.data.bonus.values.length !== 12)) throw new Error("Must provide bonus values!");
       if (posReq.data.bonus_option === "Percent" && !posReq.data.bonus_pct) throw new Error("Must provide bonus percentage");
-      if (!posReq.data.ftes || posReq.data.ftes.length !== 12) throw new Error("Must provide 12 months of FTEs");
+      if (!posReq.data.ftes || posReq.data.ftes.values.length !== 12) throw new Error("Must provide 12 months of FTEs");
     }
   } catch (error) {
     throw new Error(`Invalid request to save labor: ${error}`);
