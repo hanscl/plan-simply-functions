@@ -116,12 +116,14 @@ export function calculateBonus(posData: laborModel.PositionData, wages: number[]
 
   if (posData.bonus_option === 'Value') {
     if (!posData.bonus) throw new Error('Must provide 12 months of bonus data for bonus type "Value"');
-    bonus.values = posData.bonus?.values;
+    bonus.values = posData.bonus.values;
   } else if (posData.bonus_option === 'Percent') {
     posData.bonus_pct = posData.bonus_pct ? posData.bonus_pct / 100 : 0;
     bonus.values = wages.map((val) => {
       return val * (posData.bonus_pct ? posData.bonus_pct : 0);
     });
+  } else { // bonus = "none"
+    posData.bonus_pct = 0;
   }
 
   // calculate total
@@ -136,6 +138,8 @@ export function calculateBonus(posData: laborModel.PositionData, wages: number[]
 
 export function calculateSocialSec(posData: laborModel.PositionData, wages: number[]): laborModel.LaborCalc {
   const socialsec: laborModel.LaborCalc = { total: 0, values: utils.getValuesArray() };
+
+  posData.socialsec_pct = posData.socialsec_pct / 100;
 
   socialsec.values = wages.map((val) => {
     return val * posData.socialsec_pct;
