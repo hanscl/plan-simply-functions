@@ -246,3 +246,15 @@ export function valuesNullConversion(values: number[]) {
   console.log(`clean array before return: ${JSON.stringify(values)}`);
   return found_null;
 }
+
+export function arraySubtract(minuend: number[], subtrahend: number[]): number[] {
+  if (minuend.length !== subtrahend.length) throw new Error("Subtracting arrays must have same length");
+
+  const difference: number[] = [];
+
+  for (let idx = 0; idx < minuend.length; idx++) {
+    difference.push(minuend[idx] - subtrahend[idx]);
+  }
+
+  return difference;
+}

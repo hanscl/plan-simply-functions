@@ -1,27 +1,58 @@
+import * as admin from 'firebase-admin';
+
 export interface laborVersionDoc {
   plan_id: string;
   version_id: string;
 }
 
-export interface positionDoc {
-  acct?: string;
-  dept?: string;
-  div?: string; // for filtering only - do not display in UI
-  pos: string;
-  status?: "Salary" | "Hourly";
-  rate?: rateMap;
-  fte_factor?: number;
-  wages?: laborCalc;
-  ftes?: laborCalc;
-  is_updating?: boolean;
+export interface SavePositionRequest {
+  action: 'create' | 'update' | 'delete';
+  entityId: string;
+  planId: string;
+  versionId: string;
+  positionId?: string; //firstore document id
+  data?: PositionData;
 }
 
-interface rateMap {
+export interface PositionData {
+  acct: string;
+  dept: string;
+  title: string;
+  pay_type: 'Salary' | 'Hourly';
+  rate: RateMap;
+  fte_factor: number;
+  ftes: LaborCalc;
+  bonus_option: 'None' | 'Percent' | 'Value';
+  bonus_pct?: number;
+  bonus?: LaborCalc;
+  socialsec_pct: number;
+}
+
+export interface PositionDoc {
+  comments: string;
+  acct: string;
+  dept: string;
+  div: string;
+  title: string;
+  pay_type: 'Salary' | 'Hourly';
+  rate: RateMap;
+  fte_factor: number;
+  bonus_option: 'None' | 'Percent' | 'Value';
+  bonus: LaborCalc;
+  bonus_pct: number;
+  wages: LaborCalc;
+  ftes: LaborCalc;
+  socialsec_pct: number;
+  socialsec: LaborCalc;
+  last_updated: admin.firestore.Timestamp;
+}
+
+export interface RateMap {
   annual?: number;
   hourly?: number;
 }
 
-export interface laborCalc {
+export interface LaborCalc {
   total: number;
   values: number[];
 }
@@ -38,6 +69,6 @@ export interface laborValidationResponse {
 }
 
 export interface laborValidationResponseAlt {
-    valid_depts: string[];
-    valid_accts: { dept_id: string; acct_ids: string; }[];
-  }
+  valid_depts: string[];
+  valid_accts: { dept_id: string; acct_ids: string }[];
+}

@@ -8,12 +8,19 @@ export interface entityDoc {
   full_account_export: string;
   acct_type_flip_sign?: string[];
   type: string;
-  entity_embeds?: entityEmbed[]; 
-  labor_calcs?: laborCalcs;
+  entity_embeds?: entityEmbed[];
+  labor_settings: LaborSettings;
 }
 
-export interface laborCalcs {
+export interface LaborSettings {
+  default_accts: LaborDefaultAccounts;
+  socialsec_pct?: number;
   wage_method: "eu" | "us";
+}
+
+export interface LaborDefaultAccounts {
+  bonus: string;
+  socialsec: string;
 }
 
 export interface entityEmbed {
@@ -99,4 +106,3 @@ export interface hierLevel {
   id: string;
   children?: hierLevel[];
 }
-
