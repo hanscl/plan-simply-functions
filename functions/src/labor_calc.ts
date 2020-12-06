@@ -118,6 +118,7 @@ export function calculateBonus(posData: laborModel.PositionData, wages: number[]
     if (!posData.bonus) throw new Error('Must provide 12 months of bonus data for bonus type "Value"');
     bonus.values = posData.bonus?.values;
   } else if (posData.bonus_option === 'Percent') {
+    posData.bonus_pct = posData.bonus_pct ? posData.bonus_pct / 100 : 0;
     bonus.values = wages.map((val) => {
       return val * (posData.bonus_pct ? posData.bonus_pct : 0);
     });

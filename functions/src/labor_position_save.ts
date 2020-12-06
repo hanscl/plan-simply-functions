@@ -54,6 +54,8 @@ export const laborPositionRequest = functions.region(config.cloudFuncLoc).https.
 
       const laborPosRequest = request.body as laborModel.SavePositionRequest;
 
+      console.log(`Processing SavePositionRequest: ${JSON.stringify(laborPosRequest)}`);
+
       // make sure the request is valid. This will throw an error if it is not.
       checkRequestIsValid(laborPosRequest);
 
