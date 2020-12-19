@@ -103,7 +103,7 @@ export const planViewGenerate = functions.firestore
       if (rollup_doc_snap.empty) throw new Error("Unable to find any n-level rollup accounts, which should not be happening!");
 
       for (const rollup_def_doc of rollup_doc_snap.docs) {
-        const rollup_def_obj = rollup_def_doc.data() as entity_model.rollupObj;
+        const rollup_def_obj = rollup_def_doc.data() as entity_model.EntityRollupDocument;
         context_params.n_level_rollups.push(rollup_def_obj.rollup);
       }
 

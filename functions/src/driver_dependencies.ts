@@ -31,9 +31,9 @@ export async function driverDependencyBuild(
     // rollup and group document path
     const rollup_doc_path = `entities/${context_params.entity_id}/entity_structure/rollup`;
     const rollup_coll_snap = await db.collection(`${rollup_doc_path}/rollups`).get();
-    const rollups: entity_model.rollupObj[] = [];
+    const rollups: entity_model.EntityRollupDocument[] = [];
     rollup_coll_snap.forEach((rollup_doc) => {
-      rollups.push(rollup_doc.data() as entity_model.rollupObj);
+      rollups.push(rollup_doc.data() as entity_model.EntityRollupDocument);
     });
 
     // load groups
@@ -88,7 +88,7 @@ export async function driverDependencyBuild(
 }
 
 /***** HELPER FUNCTION TO CHECK IF ACCOUNT IS A ROLLUP */
-function acctIsRollup(driver_account: string, entity: entity_model.entityDoc, rollups: entity_model.rollupObj[]): boolean {
+function acctIsRollup(driver_account: string, entity: entity_model.entityDoc, rollups: entity_model.EntityRollupDocument[]): boolean {
   // console.log(`calling UTILS.exctratComp with ${JSON.stringify(driver_account)} & ${entity.full_account} ${entity.div_account}`);
   const acct = utils.extractAcctFromFullAccount(driver_account, [entity.full_account, entity.div_account], "acct");
 
@@ -108,7 +108,7 @@ function getRollupChildren(
   entity: entity_model.entityDoc,
   div_dict: entity_model.divDict,
   groups: entity_model.groupObj[],
-  rollups: entity_model.rollupObj[],
+  rollups: entity_model.EntityRollupDocument[],
   acct_dict: entity_model.acctDict
 ) {
   // Extract the acct elements
@@ -179,7 +179,7 @@ function getRollupChildren(
 async function resolveRollups(
   acct_lst: string[],
   entity: entity_model.entityDoc,
-  rollups: entity_model.rollupObj[],
+  rollups: entity_model.EntityRollupDocument[],
   div_dict: entity_model.divDict,
   acct_dict: entity_model.acctDict,
   groups: entity_model.groupObj[]

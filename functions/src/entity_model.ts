@@ -74,7 +74,7 @@ export interface acctComponents {
   acct: string;
 }
 
-export interface rollupObj {
+export interface EntityRollupDocument {
   level: number;
   n_level: boolean;
   rollup: string;
