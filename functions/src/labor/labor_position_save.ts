@@ -1,14 +1,14 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
-import * as https_utils from "./https_utils";
-import * as utils from "./utils";
-import * as config from "./config";
+import * as https_utils from "../https_utils";
+import * as utils from "../utils";
+import * as config from "../config";
 import * as laborModel from "./labor_model";
 import * as laborCalc from "./labor_calc";
-import * as entityModel from "./entity_model";
-import * as planModel from "./plan_model";
-import * as cloudTasks from "./gcloud_task_dispatch";
-import * as rollupRecalc from "./version_rollup_recalc_master";
+import * as entityModel from "../entity_model";
+import * as planModel from "../plan_model";
+import * as cloudTasks from "../gcloud_task_dispatch";
+import * as rollupRecalc from "../version_rollup_recalc_master";
 
 const cors = require("cors")({ origin: true });
 

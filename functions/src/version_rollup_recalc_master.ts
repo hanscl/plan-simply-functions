@@ -88,6 +88,7 @@ export async function beginVersionRollupRecalc(
     console.log(`Completed updating acct with values: ${JSON.stringify(recalc_params.values)}`);
   } catch (error) {
     console.log(`Failure at beginVersionRollupRecalc: ${error}`);
+    throw new Error('beginVersionRollupRecalc rethrow');
   }
 }
 
@@ -139,7 +140,7 @@ export const versionRollupRecalcGCT = functions.region(config.cloudFuncLoc).http
 
     response.status(200).send({ result: `Version Comparison ready.` });
   } catch (error) {
-    console.log(`Error occured while requesting versionRollupRecalcGCT: ${error}`);
+    console.log(`Error occured while requesting versionRollupRecalcGCT: ${error}. This should be retried.`);
     response.status(500).send({ result: `Could not execute versionRollupRecalcGCT. Please contact support` });
   }
 });

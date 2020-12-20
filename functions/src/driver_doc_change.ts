@@ -106,9 +106,9 @@ async function createVersionDriverDoc(entity_id: string, version_id: string) {
   }
 }
 
-export async function deleteDriverDefinition(entity_id: string, plan_id: string, version_id: string, acct_id: string) {
+export async function deleteDriverDefinition(entity_id: string, version_id: string, acct_id: string) {
   try {
-    await db.doc(`entities/${entity_id}/plans/${plan_id}/versions/${version_id}/dept/${acct_id}`).delete();
+    await db.doc(`entities/${entity_id}/drivers/${version_id}/dept/${acct_id}`).delete();
   } catch (error) {
     console.log(`Error occured during [deleteDriverDefinition]: ${error}`);
   }

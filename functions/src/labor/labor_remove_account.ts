@@ -1,6 +1,6 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
-import * as plan_model from "./plan_model";
+import * as plan_model from "../plan_model";
 
 const db = admin.firestore();
 

@@ -1,5 +1,5 @@
 import * as laborModel from './labor_model';
-import * as utils from './utils';
+import * as utils from '../utils';
 
 export function calculateWagesEU(posData: laborModel.PositionData, ftes: number[]): laborModel.LaborCalc {
   try {
@@ -144,6 +144,13 @@ export function calculateSocialSec(posData: laborModel.PositionData, wages: numb
   socialsec.values = wages.map((val) => {
     return val * posData.socialsec_pct;
   });
+
+   // calculate total
+   socialsec.total = utils.finRound(
+    socialsec.values.reduce((a, b) => {
+      return a + b;
+    }, 0)
+  );
 
   return socialsec;
 }

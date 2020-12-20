@@ -1,7 +1,7 @@
 import * as admin from "firebase-admin";
 import * as export_model from "./export_model";
 import * as view_model from "./view_model";
-import * as labor_model from "./labor_model";
+import * as labor_model from "./labor/labor_model";
 import * as plan_model from "./plan_model";
 const xls = require("excel4node");
 
