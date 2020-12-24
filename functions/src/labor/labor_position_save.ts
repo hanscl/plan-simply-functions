@@ -9,6 +9,7 @@ import * as entityModel from '../entity_model';
 import * as planModel from '../plan_model';
 import * as cloudTasks from '../gcloud_task_dispatch';
 import * as rollupRecalc from '../version_rollup_recalc_master';
+import { deleteDriverDefinition } from '../driver_doc_change';
 
 const cors = require('cors')({ origin: true });
 
@@ -203,6 +204,7 @@ async function updateLaborAccounts(
     // get the entity doc and pass to the recalc function
     const entityDoc = await db.doc(`entities/${posReq.entityId}`).get();
     const entityData = entityDoc.data() as entityModel.entityDoc;
+    const acctFormatString = entityData.full_account;
 
     let newPosDiv = '';
     if (posReq.action !== 'delete' && posReq.data) newPosDiv = await getPositionDiv(posReq.entityId, posReq.data.dept);
@@ -241,6 +243,13 @@ async function updateLaborAccounts(
       }
     } else if (posReq.action === 'create') {
       if (!posReq.data) throw new Error('Need data object to create position');
+      const acctComponents = { div: newPosDiv, dept: posReq.data.dept };
+      await deleteDriverDefinition(
+        posReq.entityId,
+        posReq.versionId,
+        utils.buildFullAccountString([acctFormatString], { ...acctComponents, acct: posReq.data?.acct })
+      );
+
       await scheduleCloudTaskRecalc(
         entityData,
         posReq,
@@ -251,6 +260,11 @@ async function updateLaborAccounts(
         wagesAfter
       );
       if (posReq.laborVersion > 1) {
+        await deleteDriverDefinition(
+          posReq.entityId,
+          posReq.versionId,
+          utils.buildFullAccountString([acctFormatString], { ...acctComponents, acct: laborAccts.bonus })
+        );
         await scheduleCloudTaskRecalc(
           entityData,
           posReq,
@@ -259,6 +273,11 @@ async function updateLaborAccounts(
           newPosDiv,
           bonusBefore,
           bonusAfter
+        );
+        await deleteDriverDefinition(
+          posReq.entityId,
+          posReq.versionId,
+          utils.buildFullAccountString([acctFormatString], { ...acctComponents, acct: laborAccts.socialsec })
         );
         await scheduleCloudTaskRecalc(
           entityData,
@@ -304,6 +323,12 @@ async function updateLaborAccounts(
           );
         }
         // add values to new account
+        const acctComponents = { div: newPosDiv, dept: posReq.data.dept };
+        await deleteDriverDefinition(
+          posReq.entityId,
+          posReq.versionId,
+          utils.buildFullAccountString([acctFormatString], { ...acctComponents, acct: posReq.data?.acct })
+        );
         await scheduleCloudTaskRecalc(
           entityData,
           posReq,
@@ -314,6 +339,11 @@ async function updateLaborAccounts(
           wagesAfter
         );
         if (posReq.laborVersion > 1) {
+          await deleteDriverDefinition(
+            posReq.entityId,
+            posReq.versionId,
+            utils.buildFullAccountString([acctFormatString], { ...acctComponents, acct: laborAccts.bonus })
+          );
           await scheduleCloudTaskRecalc(
             entityData,
             posReq,
@@ -322,6 +352,11 @@ async function updateLaborAccounts(
             newPosDiv,
             utils.getValuesArray(),
             bonusAfter
+          );
+          await deleteDriverDefinition(
+            posReq.entityId,
+            posReq.versionId,
+            utils.buildFullAccountString([acctFormatString], { ...acctComponents, acct: laborAccts.socialsec })
           );
           await scheduleCloudTaskRecalc(
             entityData,
@@ -344,6 +379,13 @@ async function updateLaborAccounts(
           wagesBefore,
           utils.getValuesArray()
         );
+        // add values to new account
+        const acctComponents = { div: newPosDiv, dept: posReq.data.dept };
+        await deleteDriverDefinition(
+          posReq.entityId,
+          posReq.versionId,
+          utils.buildFullAccountString([acctFormatString], { ...acctComponents, acct: posReq.data?.acct })
+        );
         await scheduleCloudTaskRecalc(
           entityData,
           posReq,
@@ -355,6 +397,11 @@ async function updateLaborAccounts(
         );
         // for bonus & social sec just update the existing account
         if (posReq.laborVersion > 1) {
+          await deleteDriverDefinition(
+            posReq.entityId,
+            posReq.versionId,
+            utils.buildFullAccountString([acctFormatString], { ...acctComponents, acct: laborAccts.bonus })
+          );
           await scheduleCloudTaskRecalc(
             entityData,
             posReq,
@@ -363,6 +410,11 @@ async function updateLaborAccounts(
             newPosDiv,
             bonusBefore,
             bonusAfter
+          );
+          await deleteDriverDefinition(
+            posReq.entityId,
+            posReq.versionId,
+            utils.buildFullAccountString([acctFormatString], { ...acctComponents, acct: laborAccts.socialsec })
           );
           await scheduleCloudTaskRecalc(
             entityData,
@@ -375,6 +427,13 @@ async function updateLaborAccounts(
           );
         }
       } else {
+        // add values to new account
+        const acctComponents = { div: newPosDiv, dept: posReq.data.dept };
+        await deleteDriverDefinition(
+          posReq.entityId,
+          posReq.versionId,
+          utils.buildFullAccountString([acctFormatString], { ...acctComponents, acct: posReq.data?.acct })
+        );
         // all three accounts and the dept are the same. Just update those accounts
         await scheduleCloudTaskRecalc(
           entityData,
@@ -386,6 +445,11 @@ async function updateLaborAccounts(
           wagesAfter
         );
         if (posReq.laborVersion > 1) {
+          await deleteDriverDefinition(
+            posReq.entityId,
+            posReq.versionId,
+            utils.buildFullAccountString([acctFormatString], { ...acctComponents, acct: laborAccts.bonus })
+          );
           await scheduleCloudTaskRecalc(
             entityData,
             posReq,
@@ -394,6 +458,11 @@ async function updateLaborAccounts(
             newPosDiv,
             bonusBefore,
             bonusAfter
+          );
+          await deleteDriverDefinition(
+            posReq.entityId,
+            posReq.versionId,
+            utils.buildFullAccountString([acctFormatString], { ...acctComponents, acct: laborAccts.socialsec })
           );
           await scheduleCloudTaskRecalc(
             entityData,
