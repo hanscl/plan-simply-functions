@@ -37,10 +37,10 @@ export { getValidDriverAccounts } from "./https_valid_driver_accounts";
 export { sendPasswordResetLink } from "./https_password_reset_email";
 
 // Labor
-export { laborEntryUpdate } from "./labor_entry_update";
-export { laborRemoveAccount } from "./labor_remove_account";
+export { laborEntryUpdate } from "./labor/labor_entry_update";
+export { laborRemoveAccount } from "./labor/labor_remove_account";
 export { getLaborValidations } from "./https_validate_labor";
-export { laborPositionRequest } from "./labor_position_save";
+export { laborPositionRequest } from "./labor/labor_position_save";
 
 // Version Comparison
 export { initVersionComparison } from "./version_comparison_init";

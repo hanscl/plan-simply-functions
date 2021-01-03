@@ -20,6 +20,7 @@ export interface versionDoc {
   ready_for_view?: boolean;
   child_version_ids: string[];
   is_locked: versionLockStatus;
+  labor_version?: number;
 }
 
 export interface versionLockStatus {

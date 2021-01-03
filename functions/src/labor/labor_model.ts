@@ -12,6 +12,7 @@ export interface SavePositionRequest {
   versionId: string;
   positionId?: string; //firstore document id
   data?: PositionData;
+  laborVersion: number;
 }
 
 export interface PositionData {

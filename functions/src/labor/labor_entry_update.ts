@@ -1,10 +1,10 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import * as labor_model from "./labor_model";
-import * as plan_model from "./plan_model";
-import * as utils from "./utils";
-import * as entity_model from "./entity_model";
-import * as version_recalc from "./version_rollup_recalc_master";
+import * as plan_model from "../plan_model";
+import * as utils from "../utils";
+import * as entity_model from "../entity_model";
+import * as version_recalc from "../version_rollup_recalc_master";
 
 const db = admin.firestore();
 
