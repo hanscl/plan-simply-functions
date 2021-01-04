@@ -7,30 +7,15 @@ import * as utils from '../utils';
 
 const db = admin.firestore();
 
-// interface AccountNode {
-//   level: 'pnl' | 'div' | 'dept';
-//   accountId: string;
-//   dependentNodes: AccountNode[];
-//   parentNodes: AccountNode[];
-//   accountChildren: string[];
-// }
-
-// interface DriverAccount {
-//   acctId: string;
-//   dependentAccts: string[];
-// }
-
 interface CalcRequest {
   entityId: string;
   planId: string;
   versionId: string;
 }
 
-// interface PendingAccounts {
-//   pnl: string[];
-//   div: string[];
-//   driver: string[];
-// }
+export type PendingAccountByLevel = {
+  [k: string]: string[];
+};
 
 interface AccountTotal {
   acctId: string;
@@ -49,8 +34,55 @@ export const versionFullCalc = async (calcRequest: CalcRequest) => {
     const entity = await getEntityDetails(calcRequest.entityId);
     const version = await getVersionDetails(calcRequest);
     await sumUpLaborTotalsFromPositions(calcRequest, entity, version);
+    // get all pending account
+    const pendingRollups = await getUncalculatedRollups(calcRequest);
+    const pendingDriverAccounts = await getUncalculatedDriverAccounts(calcRequest);
+    console.log(pendingRollups,pendingDriverAccounts);
   } catch (error) {
     console.log(`Error in versionFullCalc: ${error}`);
+  }
+};
+
+const getUncalculatedRollups = async (calcRequest: CalcRequest): Promise<PendingAccountByLevel> => {
+  try {
+    const pendingRollups: PendingAccountByLevel = { dept: [], div: [], pnl: [] };
+    for (const rollupLevel of Object.keys(pendingRollups)) {
+      let query: FirebaseFirestore.CollectionReference | FirebaseFirestore.Query;
+      query = db.collection(
+        `entities/${calcRequest.entityId}/plans/${calcRequest.planId}/versions/${calcRequest.versionId}/${rollupLevel}`
+      );
+      if (rollupLevel === 'dept') {
+        query = query.where('class', '==', 'rollup');
+      }
+      const rollupCollectionSnapshot = await query.get();
+      for (const rollupDocument of rollupCollectionSnapshot.docs) {
+        pendingRollups[rollupLevel].push(rollupDocument.id);
+      }
+    }
+    return pendingRollups;
+  } catch (error) {
+    throw new Error(`Error occured in [getUncalculatedRollups]: ${error}`);
+  }
+};
+
+const getUncalculatedDriverAccounts = async (calcRequest: CalcRequest): Promise<PendingAccountByLevel> => {
+  try {
+    // get all pnl accounts
+    const pendingDriverAccounts: PendingAccountByLevel = { dept: [] };
+
+    const query = db
+      .collection(
+        `entities/${calcRequest.entityId}/plans/${calcRequest.planId}/versions/${calcRequest.versionId}/dept`
+      )
+      .where('calc_type', '==', 'driver');
+
+    const driverAccountCollectionSnapshot = await query.get();
+    for (const driverAccountDocument of driverAccountCollectionSnapshot.docs) {
+      pendingDriverAccounts['dept'].push(driverAccountDocument.id);
+    }
+    return pendingDriverAccounts;
+  } catch (error) {
+    throw new Error(`Error occured in [getUncalculatedDriverAccounts]: ${error}`);
   }
 };
 
@@ -137,8 +169,6 @@ const addAccountValue = (
   }
 };
 
-
-
 const getEntityDetails = async (entityId: string): Promise<entityModel.entityDoc> => {
   const entityDocument = await db.doc(`entities/${entityId}`).get();
   if (!entityDocument.exists) {
@@ -156,34 +186,6 @@ const getVersionDetails = async (calcRequest: CalcRequest): Promise<planModel.ve
   }
   return versionDocument.data() as planModel.versionDoc;
 };
-
-// const getDriverAccounts = async (calcRequest: CalcRequest): Promise<DriverAccount[]> => {
-//   try {
-//     const DriverAccount[] = [];
-//     const driverCollectionSnapshot = await db.collection(`entities/${calcRequest.entityId}/drivers/${calcRequest.versionId}/dept`).get();
-
-//   } catch (error) {
-//     console.log(`Error occured at getDriverAccounts: ${error}`);
-//   }
-// };
-
-// const buildRollupHierarchy = async (entityId: string, planId: string, versionId: string) => {
-//   const accountCalculationTree: AccountNode[] = [];
-//   console.log(accountCalculationTree);
-//   // query rollups ordered by level
-//   const rollupQuerySnapshot = await db.collection(`entities/${entityId}/entity_structure/rollup/rollups`).get();
-
-//   for (const rollupDocument of rollupQuerySnapshot.docs) {
-//     const rollupDefinition = rollupDocument.data() as EntityRollupDocument;
-//     console.log(rollupDefinition);
-//   }
-// };
-
-// interface Test {
-//   entityId: string;
-//   planId: string;
-//   versionId: string;
-// }
 
 export const testRollupHierarchy = functions.https.onCall(async (data, context) => {
   try {
