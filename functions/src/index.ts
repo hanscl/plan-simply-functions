@@ -48,3 +48,6 @@ export { processVersionComparison } from "./version_comparison_init";
 
 // Recalc
 export { versionRollupRecalcGCT } from "./version_rollup_recalc_master";
+
+// Fullcalc
+export { testRollupHierarchy } from './version_calc/version_fullcalc';

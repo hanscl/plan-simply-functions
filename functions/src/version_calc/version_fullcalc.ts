@@ -1,24 +1,195 @@
 import * as admin from 'firebase-admin';
-import { EntityRollupDocument } from '../entity_model';
+import * as functions from 'firebase-functions';
+import * as entityModel from '../entity_model';
+import * as laborModel from '../labor/labor_model';
+import * as planModel from '../plan_model';
+import * as utils from '../utils';
 
 const db = admin.firestore();
 
-interface AccountNode {
-  level: 'pnl' | 'div' | 'dept';
-  accountId: string;
-  dependentNodes: AccountNode[];
-  parentNodes: AccountNode[];
-  accountChildren: string[];
+// interface AccountNode {
+//   level: 'pnl' | 'div' | 'dept';
+//   accountId: string;
+//   dependentNodes: AccountNode[];
+//   parentNodes: AccountNode[];
+//   accountChildren: string[];
+// }
+
+// interface DriverAccount {
+//   acctId: string;
+//   dependentAccts: string[];
+// }
+
+interface CalcRequest {
+  entityId: string;
+  planId: string;
+  versionId: string;
 }
 
-export const versionFullCalc = async () => {};
+// interface PendingAccounts {
+//   pnl: string[];
+//   div: string[];
+//   driver: string[];
+// }
 
-const buildRollupHierarchy = async (entityId: string, planId: string, versionId: string) => {
-  const accountCalculationTree: AccountNode[] = [];
-  // query rollups ordered by level
-  const rollupQuerySnapshot = await db.collection(`entities/${entityId}/entity_structure/rollup/rollups`).get();
+interface AccountTotal {
+  acctId: string;
+  values: number[];
+  total: number;
+}
 
-  for (const rollupDocument of rollupQuerySnapshot.docs) {
-    const rollupDefinition = rollupDocument.data() as EntityRollupDocument;
+interface AccountComponents {
+  acctId: string;
+  deptId: string;
+  divId: string;
+}
+
+export const versionFullCalc = async (calcRequest: CalcRequest) => {
+  try {
+    const entity = await getEntityDetails(calcRequest.entityId);
+    const version = await getVersionDetails(calcRequest);
+    await sumUpLaborTotalsFromPositions(calcRequest, entity, version);
+  } catch (error) {
+    console.log(`Error in versionFullCalc: ${error}`);
   }
 };
+
+const sumUpLaborTotalsFromPositions = async (
+  calcRequest: CalcRequest,
+  entity: entityModel.entityDoc,
+  version: planModel.versionDoc
+) => {
+  try {
+    // loop through all positions, add wages (and bonus/socialSec for v2) and set account to laborCalc
+    const positionCollectionSnapshot = await db
+      .collection(`entities/${calcRequest.entityId}/labor/${calcRequest.versionId}/positions`)
+      .get();
+    const laborAccountTotals: AccountTotal[] = [];
+    for (const positionDocument of positionCollectionSnapshot.docs) {
+      const position = positionDocument.data() as laborModel.PositionDoc;
+      const acctDivDept = { deptId: position.dept, divId: position.div };
+      addAccountValue({ ...acctDivDept, acctId: position.acct }, laborAccountTotals, position.wages.values, entity);
+
+      // OPTIONAL FOR LABOR MODEL V2
+      if (version.labor_version && version.labor_version > 1) {
+        const acctSocialCmpnts = { ...acctDivDept, acctId: entity.labor_settings.default_accts.socialsec };
+        addAccountValue(acctSocialCmpnts, laborAccountTotals, position.socialsec.values, entity);
+
+        const acctBonusCmpnts = { ...acctDivDept, acctId: entity.labor_settings.default_accts.bonus };
+        if (position.bonus_option !== 'None') {
+          addAccountValue(acctBonusCmpnts, laborAccountTotals, position.bonus.values, entity);
+        }
+      }
+    }
+
+    await updateLaborAccountsInFirestore(calcRequest, laborAccountTotals);
+  } catch (error) {
+    console.log(`Error occured in [sumUpLaborTotalsFromPositions]: ${error}`);
+  }
+};
+
+const updateLaborAccountsInFirestore = async (calcRequest: CalcRequest, laborAccountTotals: AccountTotal[]) => {
+  try {
+    const firestoreBatch = db.batch();
+    let batchCounter = 0;
+    // firstly, calculate Totals
+    laborAccountTotals.map((account) => {
+      account.total = account.values.reduce((a, b) => a + b, 0);
+    });
+    console.log(`LABOR ACCOUNTS AFTER MAP-REDUCE: ${JSON.stringify(laborAccountTotals)}`);
+    for (const laborAccount of laborAccountTotals) {
+      console.log(`updating account ${JSON.stringify(laborAccount)} in firestore`);
+      firestoreBatch.update(
+        db.doc(
+          `entities/${calcRequest.entityId}/plans/${calcRequest.planId}/versions/${calcRequest.versionId}/dept/${laborAccount.acctId}`
+        ),
+        { total: laborAccount.total, values: laborAccount.values, calc_type: 'labor' }
+      );
+      batchCounter++;
+    }
+
+    if (batchCounter > 0) {
+      // TODO: COMMENT IN FIRESTORE COMMIT
+      // firestoreBatch.commit();
+    }
+  } catch (error) {
+    console.log(`Error occured in [updateLaborAccountsInFirestore]: ${error}`);
+  }
+};
+
+const addAccountValue = (
+  acctCmpnts: AccountComponents,
+  accountList: AccountTotal[],
+  valuesToAdd: number[],
+  entity: entityModel.entityDoc
+) => {
+  const fullAccountString = utils.buildFullAccountString([entity.full_account], {
+    dept: acctCmpnts.deptId,
+    div: acctCmpnts.divId,
+    acct: acctCmpnts.acctId,
+  });
+  // see if account is already in array and add values if found; otherwise add new
+  const filteredAccounts = accountList.filter((acct) => acct.acctId === fullAccountString);
+  if (filteredAccounts.length > 0) {
+    filteredAccounts[0].values = utils.addValuesByMonth(filteredAccounts[0].values, valuesToAdd);
+  } else {
+    accountList.push({ acctId: fullAccountString, values: valuesToAdd, total: 0 });
+  }
+};
+
+
+
+const getEntityDetails = async (entityId: string): Promise<entityModel.entityDoc> => {
+  const entityDocument = await db.doc(`entities/${entityId}`).get();
+  if (!entityDocument.exists) {
+    throw new Error(`Entity Doc not found at getEntityDetails => This should never happen`);
+  }
+  return entityDocument.data() as entityModel.entityDoc;
+};
+
+const getVersionDetails = async (calcRequest: CalcRequest): Promise<planModel.versionDoc> => {
+  const versionDocument = await db
+    .doc(`entities/${calcRequest.entityId}/plans/${calcRequest.planId}/versions/${calcRequest.versionId}`)
+    .get();
+  if (!versionDocument.exists) {
+    throw new Error(`Version Doc not found at getVersionDetails => This should never happen`);
+  }
+  return versionDocument.data() as planModel.versionDoc;
+};
+
+// const getDriverAccounts = async (calcRequest: CalcRequest): Promise<DriverAccount[]> => {
+//   try {
+//     const DriverAccount[] = [];
+//     const driverCollectionSnapshot = await db.collection(`entities/${calcRequest.entityId}/drivers/${calcRequest.versionId}/dept`).get();
+
+//   } catch (error) {
+//     console.log(`Error occured at getDriverAccounts: ${error}`);
+//   }
+// };
+
+// const buildRollupHierarchy = async (entityId: string, planId: string, versionId: string) => {
+//   const accountCalculationTree: AccountNode[] = [];
+//   console.log(accountCalculationTree);
+//   // query rollups ordered by level
+//   const rollupQuerySnapshot = await db.collection(`entities/${entityId}/entity_structure/rollup/rollups`).get();
+
+//   for (const rollupDocument of rollupQuerySnapshot.docs) {
+//     const rollupDefinition = rollupDocument.data() as EntityRollupDocument;
+//     console.log(rollupDefinition);
+//   }
+// };
+
+// interface Test {
+//   entityId: string;
+//   planId: string;
+//   versionId: string;
+// }
+
+export const testRollupHierarchy = functions.https.onCall(async (data, context) => {
+  try {
+    console.log(`Processing request with values: ${JSON.stringify(data)}`);
+    await versionFullCalc(data);
+  } catch (error) {
+    console.log(`Error occured`);
+  }
+});
