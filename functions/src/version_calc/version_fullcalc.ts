@@ -4,6 +4,8 @@ import * as entityModel from '../entity_model';
 import * as laborModel from '../labor/labor_model';
 import * as planModel from '../plan_model';
 import * as utils from '../utils';
+import * as viewModel from '../view_model';
+import * as driverModel from '../driver_model';
 
 const db = admin.firestore();
 
@@ -14,8 +16,13 @@ interface CalcRequest {
 }
 
 export type PendingAccountByLevel = {
-  [k: string]: string[];
+  [k: string]: AccountWithDependencies[];
 };
+
+interface AccountWithDependencies {
+  fullAccountId: string;
+  dependentAccounts: string[];
+}
 
 interface AccountTotal {
   acctId: string;
@@ -31,13 +38,21 @@ interface AccountComponents {
 
 export const versionFullCalc = async (calcRequest: CalcRequest) => {
   try {
+    // Calculate LABOR
     const entity = await getEntityDetails(calcRequest.entityId);
     const version = await getVersionDetails(calcRequest);
     await sumUpLaborTotalsFromPositions(calcRequest, entity, version);
-    // get all pending account
+
+    // get all pending ROLLUP accounts & its direct dependents
     const pendingRollups = await getUncalculatedRollups(calcRequest);
+    await getDivDeptRollupChildren(calcRequest, pendingRollups, entity);
+    await getPnlRollupChildren(calcRequest, pendingRollups);
+    console.log(`Rollup Accts with dependents: ${JSON.stringify(pendingRollups)}`);
+
+    // get all pending DRIVER accounts & the dependents
     const pendingDriverAccounts = await getUncalculatedDriverAccounts(calcRequest);
-    console.log(pendingRollups,pendingDriverAccounts);
+    await getDriverDependentAccounts(calcRequest, pendingDriverAccounts);
+    console.log(`Driver Accts with dependents: ${JSON.stringify(pendingDriverAccounts)}`);
   } catch (error) {
     console.log(`Error in versionFullCalc: ${error}`);
   }
@@ -56,12 +71,72 @@ const getUncalculatedRollups = async (calcRequest: CalcRequest): Promise<Pending
       }
       const rollupCollectionSnapshot = await query.get();
       for (const rollupDocument of rollupCollectionSnapshot.docs) {
-        pendingRollups[rollupLevel].push(rollupDocument.id);
+        pendingRollups[rollupLevel].push({ fullAccountId: rollupDocument.id, dependentAccounts: [] });
       }
     }
     return pendingRollups;
   } catch (error) {
     throw new Error(`Error occured in [getUncalculatedRollups]: ${error}`);
+  }
+};
+
+const getDivDeptRollupChildren = async (
+  calcRequest: CalcRequest,
+  uncalculatedRollups: PendingAccountByLevel,
+  entity: entityModel.entityDoc
+) => {
+  const versionDocumentReference = db.doc(
+    `entities/${calcRequest.entityId}/plans/${calcRequest.planId}/versions/${calcRequest.versionId}`
+  );
+  for (const rollupLevel of ['div', 'dept']) {
+    for (const rollupAccountWithDependents of uncalculatedRollups[rollupLevel]) {
+      const acctCmpnts = utils.extractComponentsFromFullAccountString(rollupAccountWithDependents.fullAccountId, [
+        entity.full_account,
+        entity.div_account,
+      ]);
+
+      let query = versionDocumentReference.collection('dept').where('div', '==', acctCmpnts.div);
+
+      if (rollupLevel === 'dept') {
+        query = query.where('dept', '==', acctCmpnts.dept).where('parent_rollup.acct', '==', acctCmpnts.acct);
+      } else {
+        query = query.where('acct', '==', acctCmpnts.acct);
+      }
+
+      const acctCollectionSnapshot = await query.get();
+      for (const accountDocument of acctCollectionSnapshot.docs) {
+        const account = accountDocument.data() as planModel.accountDoc;
+
+        if (account.class === 'acct' && account.calc_type !== 'driver') {
+          continue;
+        }
+
+        rollupAccountWithDependents.dependentAccounts.push(accountDocument.id);
+      }
+    }
+  }
+};
+
+const getPnlRollupChildren = async (calcRequest: CalcRequest, uncalculatedRollups: PendingAccountByLevel) => {
+  const versionDocumentReference = db.doc(
+    `entities/${calcRequest.entityId}/plans/${calcRequest.planId}/versions/${calcRequest.versionId}`
+  );
+
+  for (const rollupAccountWithDependents of uncalculatedRollups['pnl']) {
+    const pnlDocumentSnapshot = await versionDocumentReference
+      .collection('pnl')
+      .doc(rollupAccountWithDependents.fullAccountId)
+      .get();
+
+    if (!pnlDocumentSnapshot.exists) {
+      throw new Error(`pnlDocument not found in collection: ${rollupAccountWithDependents.fullAccountId}`);
+    }
+
+    const pnlAccount = pnlDocumentSnapshot.data() as viewModel.pnlAggregateDoc;
+
+    rollupAccountWithDependents.dependentAccounts = rollupAccountWithDependents.dependentAccounts.concat(
+      pnlAccount.child_accts
+    );
   }
 };
 
@@ -71,18 +146,64 @@ const getUncalculatedDriverAccounts = async (calcRequest: CalcRequest): Promise<
     const pendingDriverAccounts: PendingAccountByLevel = { dept: [] };
 
     const query = db
-      .collection(
-        `entities/${calcRequest.entityId}/plans/${calcRequest.planId}/versions/${calcRequest.versionId}/dept`
-      )
+      .collection(`entities/${calcRequest.entityId}/plans/${calcRequest.planId}/versions/${calcRequest.versionId}/dept`)
       .where('calc_type', '==', 'driver');
 
     const driverAccountCollectionSnapshot = await query.get();
     for (const driverAccountDocument of driverAccountCollectionSnapshot.docs) {
-      pendingDriverAccounts['dept'].push(driverAccountDocument.id);
+      pendingDriverAccounts['dept'].push({ fullAccountId: driverAccountDocument.id, dependentAccounts: [] });
     }
     return pendingDriverAccounts;
   } catch (error) {
     throw new Error(`Error occured in [getUncalculatedDriverAccounts]: ${error}`);
+  }
+};
+
+const getDriverDependentAccounts = async (calcRequest: CalcRequest, uncalculatedRollups: PendingAccountByLevel) => {
+  const versionDocumentReference = db.doc(
+    `entities/${calcRequest.entityId}/plans/${calcRequest.planId}/versions/${calcRequest.versionId}`
+  );
+
+  const driverDocumentReference = db.doc(`entities/${calcRequest.entityId}/drivers/${calcRequest.versionId}`);
+
+  for (const driverAccountWithDependents of uncalculatedRollups['dept']) {
+    const driverAccountSnapshot = await driverDocumentReference
+      .collection('dept')
+      .doc(driverAccountWithDependents.fullAccountId)
+      .get();
+
+    if (!driverAccountSnapshot.exists) {
+      // TODO: update account calc_type to 'entry' and remove account from driver collection
+      console.log(`ERROR: Driver document not found in collection: ${driverAccountWithDependents.fullAccountId}`);
+    }
+
+    const driverAccount = driverAccountSnapshot.data() as driverModel.acctDriverDef;
+    for (const driverEntry of driverAccount.drivers) {
+      if (driverEntry.type !== 'acct') {
+        continue;
+      }
+
+      const driverAccountEntry = driverEntry.entry as driverModel.driverAcct;
+
+      if (driverAccountEntry.level === 'div' || driverAccountEntry.level === 'pnl') {
+        driverAccountWithDependents.dependentAccounts.push(driverAccountEntry.id);
+      } else {
+        const dependentAccountSnapshot = await versionDocumentReference
+          .collection('dept')
+          .doc(driverAccountEntry.id)
+          .get();
+
+        if (!dependentAccountSnapshot.exists) {
+          throw new Error(`Could not find account in [getDriverDependentAccounts]`);
+        }
+
+        const dependentAccount = dependentAccountSnapshot.data() as planModel.accountDoc;
+
+        if (dependentAccount.class !== 'acct' || dependentAccount.calc_type === 'driver') {
+          driverAccountWithDependents.dependentAccounts.push(driverAccountEntry.id);
+        }
+      }
+    }
   }
 };
 
@@ -128,9 +249,7 @@ const updateLaborAccountsInFirestore = async (calcRequest: CalcRequest, laborAcc
     laborAccountTotals.map((account) => {
       account.total = account.values.reduce((a, b) => a + b, 0);
     });
-    console.log(`LABOR ACCOUNTS AFTER MAP-REDUCE: ${JSON.stringify(laborAccountTotals)}`);
     for (const laborAccount of laborAccountTotals) {
-      console.log(`updating account ${JSON.stringify(laborAccount)} in firestore`);
       firestoreBatch.update(
         db.doc(
           `entities/${calcRequest.entityId}/plans/${calcRequest.planId}/versions/${calcRequest.versionId}/dept/${laborAccount.acctId}`
@@ -141,7 +260,7 @@ const updateLaborAccountsInFirestore = async (calcRequest: CalcRequest, laborAcc
     }
 
     if (batchCounter > 0) {
-      // TODO: COMMENT IN FIRESTORE COMMIT
+      // TODO: COMMENT IN FIRESTORE BATCH COMMIT
       // firestoreBatch.commit();
     }
   } catch (error) {
