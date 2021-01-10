@@ -53,111 +53,149 @@ interface AccountComponents {
   divId: string;
 }
 
-export const versionFullCalc = async (calcRequest: CalcRequest) => {
+const versionFullCalc = async (calcRequest: CalcRequest) => {
   try {
     // Calculate LABOR
     const entity = await getEntityDetails(calcRequest.entityId);
     const version = await getVersionDetails(calcRequest);
     await sumUpLaborTotalsFromPositions(calcRequest, entity, version);
 
-    // get all pending ROLLUP accounts & its direct dependents
-    const uncalculatedAccounts: PendingAccountByLevel = { dept: [], div: [], pnl: [], driver: [] };
-    await getInitialUncalculatedAccounts(calcRequest, uncalculatedAccounts);
-    await getDivDeptRollupChildren(calcRequest, uncalculatedAccounts, entity);
-    await getPnlRollupChildren(calcRequest, uncalculatedAccounts);
-    await getDriverDependentAccounts(calcRequest, uncalculatedAccounts['driver']);
-    console.log(`All uncalculated accounts with dependents: ${JSON.stringify(uncalculatedAccounts)}`);
-    return;
-
-    //console.log(`Rollup Accts with dependents: ${JSON.stringify(pendingRollups, null, 2)}`);
-
+    await determineCalculationDependencies(calcRequest, entity);
     // now start processing
-    await beginFullCalculationProcess(uncalculatedAccounts);
+    await beginFullCalculationProcess(calcRequest);
+
+    // setTimeout(() => {
+    //   console.log(`Done with versionFullCalc`);
+    // }, 30000);
   } catch (error) {
     console.log(`Error in versionFullCalc: ${error}`);
   }
 };
 
-const beginFullCalculationProcess = async (uncalculatedAccounts: PendingAccountByLevel) => {
+const determineCalculationDependencies = async (calcRequest: CalcRequest, entity: entityModel.entityDoc) => {
+  // get all pending ROLLUP accounts & its direct dependents
+  const uncalculatedAccounts: PendingAccountByLevel = { dept: [], div: [], pnl: [], driver: [] };
+  await getInitialUncalculatedAccounts(calcRequest, uncalculatedAccounts);
+  await getDivDeptRollupChildren(calcRequest, uncalculatedAccounts, entity);
+  await getPnlRollupChildren(calcRequest, uncalculatedAccounts);
+  await getDriverDependentAccounts(calcRequest, uncalculatedAccounts['driver']);
+  await saveDependenciesToFirestore(uncalculatedAccounts, calcRequest);
+};
+
+const saveDependenciesToFirestore = async (uncalculatedAccounts: PendingAccountByLevel, calcRequest: CalcRequest) => {
+  let firestoreBatch = db.batch();
+  let dbOpsCounter = 0;
+
+  for (const accountType of accountTypes) {
+    const versionCalcDocRef = db.doc(`entities/${calcRequest.entityId}/calcs/${calcRequest.versionId}`);
+    await versionCalcDocRef.set({});
+    for (const acctWithDependencies of uncalculatedAccounts[accountType]) {
+      firestoreBatch.set(versionCalcDocRef.collection(accountType).doc(acctWithDependencies.fullAccountId), {
+        precedents: acctWithDependencies.dependentAccounts,
+      });
+      dbOpsCounter++;
+    }
+    if (dbOpsCounter > 0) {
+      await firestoreBatch.commit();
+      firestoreBatch = db.batch();
+      dbOpsCounter = 0;
+    }
+  }
+};
+
+const beginFullCalculationProcess = async (calcRequest: CalcRequest) => {
   const accountTypesToCalculate = [...accountTypes];
+  const versionCalcDocRef = db.doc(`entities/${calcRequest.entityId}/calcs/${calcRequest.versionId}`);
+
   console.log(`Account types still to be calculated${JSON.stringify(accountTypesToCalculate)}`);
 
   do {
     for (const accountType of accountTypesToCalculate) {
-      const remainingAccountsOfType = calculateAccounts(uncalculatedAccounts, accountType);
-      if (!remainingAccountsOfType) {
+      const acctTypeCollSnap = await versionCalcDocRef.collection(accountType).get();
+      if (acctTypeCollSnap.empty) {
         accountTypesToCalculate.splice(accountTypesToCalculate.indexOf(accountType), 1);
         console.log(
           `Removed [${accountType}] from list of types to be calculated. New List: [${JSON.stringify(
             accountTypesToCalculate
           )}]`
         );
+      } else {
+        await calculateAccounts(accountType, calcRequest);
       }
     }
   } while (accountTypesToCalculate.length > 0);
-  // console.log(calculateAccounts);
+
+  await versionCalcDocRef.delete();
 };
 
-const calculateAccounts = async (
-  uncalculatedAccounts: PendingAccountByLevel,
-  accountType: AccountCalculationType
-): Promise<number> => {
-  // const rollupNotReadyYet = uncalculatedAccounts[accountType].filter(
-  //   (acctWithDeps) => acctWithDeps.dependentAccounts.length > 0
-  // );
-  // console.log(`These ${level}-level rollups are ready to be calculated: ${JSON.stringify(rollupsReadyForCalculation, null, 2)}`);
-  // let loopNumber = 1;
-
+const calculateAccounts = async (accountType: AccountCalculationType, calcRequest: CalcRequest) => {
   console.log(`Begin calculation of accounts of type [${accountType}] that are ready for calculation`);
+  const acctTypeCollRef = db.collection(
+    `entities/${calcRequest.entityId}/calcs/${calcRequest.versionId}/${accountType}`
+  );
 
-  let foundMoreAcctsForCalc = true;
+  let acctsReadyForCalc: string[] = [];
   do {
-    const rollupsReadyForCalculation = uncalculatedAccounts[accountType].filter(
-      (acctWithDeps) => acctWithDeps.dependentAccounts.length === 0
-    );
+    acctsReadyForCalc = [];
+    const allAcctsOfTypeCollSnap = await acctTypeCollRef.get();
 
-    if (rollupsReadyForCalculation.length === 0) {
-      foundMoreAcctsForCalc = false;
+    for (const acctDocument of allAcctsOfTypeCollSnap.docs) {
+      if (acctDocument.data().precedents.length === 0) {
+        acctsReadyForCalc.push(acctDocument.id);
+      }
     }
 
-    for (const acctToBeCalculated of rollupsReadyForCalculation) {
-      console.log(`Calculating acct [${acctToBeCalculated.fullAccountId}] of type [${accountType}] ...`);
-      removeAccountFromDependencyArrays(uncalculatedAccounts, acctToBeCalculated.fullAccountId);
-      // REMOVE account from array
-      uncalculatedAccounts[accountType].splice(
-        uncalculatedAccounts[accountType].findIndex((el) => el.fullAccountId === acctToBeCalculated.fullAccountId),
-        1
-      );
+    console.log(`Found these accounts of type [${accountType}] ready for calc: ${acctsReadyForCalc}`);
+
+    let firestoreBatch = db.batch();
+    let dbOpsCounter = 0;
+    for (const acctToBeCalculated of acctsReadyForCalc) {
+      console.log(`Calculating acct [${acctToBeCalculated}] of type [${accountType}] ...`);
+
+      await removeAccountFromDependencyArrays(acctToBeCalculated, calcRequest);
+
+      firestoreBatch.delete(acctTypeCollRef.doc(acctToBeCalculated));
+      dbOpsCounter++;
+      if (dbOpsCounter > 450) {
+        await firestoreBatch.commit();
+        firestoreBatch = db.batch();
+        dbOpsCounter = 0;
+      }
     }
-  } while (foundMoreAcctsForCalc);
+    // FINAL BATCH COMMIT
+    if (dbOpsCounter > 0) {
+      await firestoreBatch.commit();
+    }
+  } while (acctsReadyForCalc.length > 0);
 
-  console.log(`No more accounts of type [${accountType}] can be calculated at this time`);
-
-  const numberOfAccountsNotCalculated = uncalculatedAccounts[accountType].filter(
-    (acctWithDeps) => acctWithDeps.dependentAccounts.length > 0
-  ).length;
-
-  console.log(`[${numberOfAccountsNotCalculated}] of type [${accountType}] are yet to be calculated`);
-
-  return numberOfAccountsNotCalculated;
+   console.log(`No more accounts of type [${accountType}] can be calculated at this time`);
 };
 
-const removeAccountFromDependencyArrays = (
-  uncalculatedAccounts: PendingAccountByLevel,
-  calculatedAccountId: string
+const removeAccountFromDependencyArrays = async (
+  calculatedAccountId: string,
+  calcRequest: CalcRequest
 ) => {
   console.log(`Removing acct [${calculatedAccountId}] from all dependencies`);
-  let accountsWithDependency: AccountWithDependencies[] = [];
-  for (const acctType of accountTypes) {
-    accountsWithDependency = accountsWithDependency.concat(
-      uncalculatedAccounts[acctType].filter((acctWithDeps) =>
-        acctWithDeps.dependentAccounts.includes(calculatedAccountId)
-      )
-    );
-  }
 
-  for (const acctWithDeps of accountsWithDependency) {
-    acctWithDeps.dependentAccounts.splice(acctWithDeps.dependentAccounts.indexOf(calculatedAccountId), 1);
+  const versionCalcDocRef = db.doc(`entities/${calcRequest.entityId}/calcs/${calcRequest.versionId}`);
+
+  let firestoreBatch = db.batch();
+  let dbOpsCounter = 0;
+  for(const acctType of accountTypes) {
+    const query = versionCalcDocRef.collection(acctType).where('precedents', 'array-contains', calculatedAccountId);
+    const dependentAcctCollSnap = await query.get();
+    for(const depAcctDoc of dependentAcctCollSnap.docs) {
+      firestoreBatch.update(depAcctDoc.ref, 'precedents', admin.firestore.FieldValue.arrayRemove(calculatedAccountId));
+      dbOpsCounter++;
+    }
+    if(dbOpsCounter > 450) {
+      await firestoreBatch.commit();
+      firestoreBatch = db.batch();
+      dbOpsCounter = 0;
+    }
+  }
+  if(dbOpsCounter > 0) {
+    await firestoreBatch.commit();
   }
 };
 
@@ -393,7 +431,7 @@ const getVersionDetails = async (calcRequest: CalcRequest): Promise<planModel.ve
   return versionDocument.data() as planModel.versionDoc;
 };
 
-export const testRollupHierarchy = functions.https.onCall(async (data, context) => {
+export const testRollupHierarchy = functions.runWith({timeoutSeconds: 300}).https.onCall(async (data, context) => {
   try {
     console.log(`Processing request with values: ${JSON.stringify(data)}`);
     await versionFullCalc(data);
@@ -402,7 +440,7 @@ export const testRollupHierarchy = functions.https.onCall(async (data, context) 
   }
 });
 
-export const testRollupHierarchyRequest = functions.https.onRequest(async (request, response) => {
+export const testRollupHierarchyRequest = functions.runWith({timeoutSeconds: 300}).https.onRequest(async (request, response) => {
   cors(request, response, async () => {
     try {
       console.log(`Processing request with values: ${JSON.stringify(request.body)}`);
