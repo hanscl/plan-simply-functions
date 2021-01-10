@@ -51,3 +51,4 @@ export { versionRollupRecalcGCT } from "./version_rollup_recalc_master";
 
 // Fullcalc
 export { testRollupHierarchy } from './version_calc/version_fullcalc';
+export { testRollupHierarchyRequest } from './version_calc/version_fullcalc';

@@ -6,6 +6,7 @@ import * as planModel from '../plan_model';
 import * as utils from '../utils';
 import * as viewModel from '../view_model';
 import * as driverModel from '../driver_model';
+const cors = require('cors')({ origin: true });
 
 const db = admin.firestore();
 
@@ -15,8 +16,24 @@ interface CalcRequest {
   versionId: string;
 }
 
+const divDeptLevelsOnly = ['dept', 'div'] as const;
+const allAccountLevels = [...divDeptLevelsOnly, 'pnl'] as const;
+const accountTypes = [...allAccountLevels, 'driver'] as const;
+type AccountCalculationType = typeof accountTypes[number];
+type AccountLevel = typeof allAccountLevels[number];
+//type DivDeptLevel = typeof divDeptLevelsOnly[number];
+type TypeToLevelDict = {
+  [k in AccountCalculationType]: AccountLevel;
+};
+const mapTypeToLevel: TypeToLevelDict = {
+  pnl: 'pnl',
+  div: 'div',
+  dept: 'dept',
+  driver: 'dept',
+};
+
 export type PendingAccountByLevel = {
-  [k: string]: AccountWithDependencies[];
+  [k in AccountCalculationType]: AccountWithDependencies[];
 };
 
 interface AccountWithDependencies {
@@ -44,37 +61,126 @@ export const versionFullCalc = async (calcRequest: CalcRequest) => {
     await sumUpLaborTotalsFromPositions(calcRequest, entity, version);
 
     // get all pending ROLLUP accounts & its direct dependents
-    const pendingRollups = await getUncalculatedRollups(calcRequest);
-    await getDivDeptRollupChildren(calcRequest, pendingRollups, entity);
-    await getPnlRollupChildren(calcRequest, pendingRollups);
-    console.log(`Rollup Accts with dependents: ${JSON.stringify(pendingRollups)}`);
+    const uncalculatedAccounts: PendingAccountByLevel = { dept: [], div: [], pnl: [], driver: [] };
+    await getInitialUncalculatedAccounts(calcRequest, uncalculatedAccounts);
+    await getDivDeptRollupChildren(calcRequest, uncalculatedAccounts, entity);
+    await getPnlRollupChildren(calcRequest, uncalculatedAccounts);
+    await getDriverDependentAccounts(calcRequest, uncalculatedAccounts['driver']);
+    console.log(`All uncalculated accounts with dependents: ${JSON.stringify(uncalculatedAccounts)}`);
+    return;
 
-    // get all pending DRIVER accounts & the dependents
-    const pendingDriverAccounts = await getUncalculatedDriverAccounts(calcRequest);
-    await getDriverDependentAccounts(calcRequest, pendingDriverAccounts);
-    console.log(`Driver Accts with dependents: ${JSON.stringify(pendingDriverAccounts)}`);
+    //console.log(`Rollup Accts with dependents: ${JSON.stringify(pendingRollups, null, 2)}`);
+
+    // now start processing
+    await beginFullCalculationProcess(uncalculatedAccounts);
   } catch (error) {
     console.log(`Error in versionFullCalc: ${error}`);
   }
 };
 
-const getUncalculatedRollups = async (calcRequest: CalcRequest): Promise<PendingAccountByLevel> => {
+const beginFullCalculationProcess = async (uncalculatedAccounts: PendingAccountByLevel) => {
+  const accountTypesToCalculate = [...accountTypes];
+  console.log(`Account types still to be calculated${JSON.stringify(accountTypesToCalculate)}`);
+
+  do {
+    for (const accountType of accountTypesToCalculate) {
+      const remainingAccountsOfType = calculateAccounts(uncalculatedAccounts, accountType);
+      if (!remainingAccountsOfType) {
+        accountTypesToCalculate.splice(accountTypesToCalculate.indexOf(accountType), 1);
+        console.log(
+          `Removed [${accountType}] from list of types to be calculated. New List: [${JSON.stringify(
+            accountTypesToCalculate
+          )}]`
+        );
+      }
+    }
+  } while (accountTypesToCalculate.length > 0);
+  // console.log(calculateAccounts);
+};
+
+const calculateAccounts = async (
+  uncalculatedAccounts: PendingAccountByLevel,
+  accountType: AccountCalculationType
+): Promise<number> => {
+  // const rollupNotReadyYet = uncalculatedAccounts[accountType].filter(
+  //   (acctWithDeps) => acctWithDeps.dependentAccounts.length > 0
+  // );
+  // console.log(`These ${level}-level rollups are ready to be calculated: ${JSON.stringify(rollupsReadyForCalculation, null, 2)}`);
+  // let loopNumber = 1;
+
+  console.log(`Begin calculation of accounts of type [${accountType}] that are ready for calculation`);
+
+  let foundMoreAcctsForCalc = true;
+  do {
+    const rollupsReadyForCalculation = uncalculatedAccounts[accountType].filter(
+      (acctWithDeps) => acctWithDeps.dependentAccounts.length === 0
+    );
+
+    if (rollupsReadyForCalculation.length === 0) {
+      foundMoreAcctsForCalc = false;
+    }
+
+    for (const acctToBeCalculated of rollupsReadyForCalculation) {
+      console.log(`Calculating acct [${acctToBeCalculated.fullAccountId}] of type [${accountType}] ...`);
+      removeAccountFromDependencyArrays(uncalculatedAccounts, acctToBeCalculated.fullAccountId);
+      // REMOVE account from array
+      uncalculatedAccounts[accountType].splice(
+        uncalculatedAccounts[accountType].findIndex((el) => el.fullAccountId === acctToBeCalculated.fullAccountId),
+        1
+      );
+    }
+  } while (foundMoreAcctsForCalc);
+
+  console.log(`No more accounts of type [${accountType}] can be calculated at this time`);
+
+  const numberOfAccountsNotCalculated = uncalculatedAccounts[accountType].filter(
+    (acctWithDeps) => acctWithDeps.dependentAccounts.length > 0
+  ).length;
+
+  console.log(`[${numberOfAccountsNotCalculated}] of type [${accountType}] are yet to be calculated`);
+
+  return numberOfAccountsNotCalculated;
+};
+
+const removeAccountFromDependencyArrays = (
+  uncalculatedAccounts: PendingAccountByLevel,
+  calculatedAccountId: string
+) => {
+  console.log(`Removing acct [${calculatedAccountId}] from all dependencies`);
+  let accountsWithDependency: AccountWithDependencies[] = [];
+  for (const acctType of accountTypes) {
+    accountsWithDependency = accountsWithDependency.concat(
+      uncalculatedAccounts[acctType].filter((acctWithDeps) =>
+        acctWithDeps.dependentAccounts.includes(calculatedAccountId)
+      )
+    );
+  }
+
+  for (const acctWithDeps of accountsWithDependency) {
+    acctWithDeps.dependentAccounts.splice(acctWithDeps.dependentAccounts.indexOf(calculatedAccountId), 1);
+  }
+};
+
+const getInitialUncalculatedAccounts = async (
+  calcRequest: CalcRequest,
+  uncalculatedAccounts: PendingAccountByLevel
+) => {
   try {
-    const pendingRollups: PendingAccountByLevel = { dept: [], div: [], pnl: [] };
-    for (const rollupLevel of Object.keys(pendingRollups)) {
+    for (const rollupType of accountTypes) {
       let query: FirebaseFirestore.CollectionReference | FirebaseFirestore.Query;
       query = db.collection(
-        `entities/${calcRequest.entityId}/plans/${calcRequest.planId}/versions/${calcRequest.versionId}/${rollupLevel}`
+        `entities/${calcRequest.entityId}/plans/${calcRequest.planId}/versions/${calcRequest.versionId}/${mapTypeToLevel[rollupType]}`
       );
-      if (rollupLevel === 'dept') {
+      if (rollupType === 'dept') {
         query = query.where('class', '==', 'rollup');
+      } else if (rollupType === 'driver') {
+        query = query.where('calc_type', '==', 'driver');
       }
       const rollupCollectionSnapshot = await query.get();
       for (const rollupDocument of rollupCollectionSnapshot.docs) {
-        pendingRollups[rollupLevel].push({ fullAccountId: rollupDocument.id, dependentAccounts: [] });
+        uncalculatedAccounts[rollupType].push({ fullAccountId: rollupDocument.id, dependentAccounts: [] });
       }
     }
-    return pendingRollups;
   } catch (error) {
     throw new Error(`Error occured in [getUncalculatedRollups]: ${error}`);
   }
@@ -88,7 +194,7 @@ const getDivDeptRollupChildren = async (
   const versionDocumentReference = db.doc(
     `entities/${calcRequest.entityId}/plans/${calcRequest.planId}/versions/${calcRequest.versionId}`
   );
-  for (const rollupLevel of ['div', 'dept']) {
+  for (const rollupLevel of divDeptLevelsOnly) {
     for (const rollupAccountWithDependents of uncalculatedRollups[rollupLevel]) {
       const acctCmpnts = utils.extractComponentsFromFullAccountString(rollupAccountWithDependents.fullAccountId, [
         entity.full_account,
@@ -140,33 +246,14 @@ const getPnlRollupChildren = async (calcRequest: CalcRequest, uncalculatedRollup
   }
 };
 
-const getUncalculatedDriverAccounts = async (calcRequest: CalcRequest): Promise<PendingAccountByLevel> => {
-  try {
-    // get all pnl accounts
-    const pendingDriverAccounts: PendingAccountByLevel = { dept: [] };
-
-    const query = db
-      .collection(`entities/${calcRequest.entityId}/plans/${calcRequest.planId}/versions/${calcRequest.versionId}/dept`)
-      .where('calc_type', '==', 'driver');
-
-    const driverAccountCollectionSnapshot = await query.get();
-    for (const driverAccountDocument of driverAccountCollectionSnapshot.docs) {
-      pendingDriverAccounts['dept'].push({ fullAccountId: driverAccountDocument.id, dependentAccounts: [] });
-    }
-    return pendingDriverAccounts;
-  } catch (error) {
-    throw new Error(`Error occured in [getUncalculatedDriverAccounts]: ${error}`);
-  }
-};
-
-const getDriverDependentAccounts = async (calcRequest: CalcRequest, uncalculatedRollups: PendingAccountByLevel) => {
+const getDriverDependentAccounts = async (calcRequest: CalcRequest, uncalculatedDrivers: AccountWithDependencies[]) => {
   const versionDocumentReference = db.doc(
     `entities/${calcRequest.entityId}/plans/${calcRequest.planId}/versions/${calcRequest.versionId}`
   );
 
   const driverDocumentReference = db.doc(`entities/${calcRequest.entityId}/drivers/${calcRequest.versionId}`);
 
-  for (const driverAccountWithDependents of uncalculatedRollups['dept']) {
+  for (const driverAccountWithDependents of uncalculatedDrivers) {
     const driverAccountSnapshot = await driverDocumentReference
       .collection('dept')
       .doc(driverAccountWithDependents.fullAccountId)
@@ -313,4 +400,15 @@ export const testRollupHierarchy = functions.https.onCall(async (data, context) 
   } catch (error) {
     console.log(`Error occured`);
   }
+});
+
+export const testRollupHierarchyRequest = functions.https.onRequest(async (request, response) => {
+  cors(request, response, async () => {
+    try {
+      console.log(`Processing request with values: ${JSON.stringify(request.body)}`);
+      await versionFullCalc(request.body);
+    } catch (error) {
+      console.log(`Error occured`);
+    }
+  });
 });
