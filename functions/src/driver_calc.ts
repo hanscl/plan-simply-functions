@@ -39,7 +39,7 @@ async function processDriverCombination(
   driver_params: driver_model.driverParamsAll,
   first_operand: number[],
   operation: "add" | "sub" | "mlt" | "dvs" | "pct",
-  next_driver: driver_model.driverEntry
+  next_driver: driver_model.DriverEntry
 ) {
   let second_operand: number[] = [];
   if (next_driver.type === "acct") second_operand = await getAccountValue(driver_tx, next_driver, driver_params);
@@ -56,7 +56,7 @@ async function processDriverCombination(
 
 async function getAccountValue(
   driver_tx: FirebaseFirestore.Transaction | undefined,
-  driver_entry: driver_model.driverEntry,
+  driver_entry: driver_model.DriverEntry,
   driver_params: driver_model.driverParamsAll
 ) {
   // make sure this is a driver account

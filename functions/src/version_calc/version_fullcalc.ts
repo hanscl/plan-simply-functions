@@ -6,31 +6,18 @@ import * as planModel from '../plan_model';
 import * as utils from '../utils';
 import * as viewModel from '../view_model';
 import * as driverModel from '../driver_model';
+import { calculateAccount } from './calculate_account';
+
+import {
+  CalcRequest,
+  AccountCalculationType,
+  accountTypes,
+  mapTypeToLevel,
+  divDeptLevelsOnly,
+} from './version_calc_model';
 const cors = require('cors')({ origin: true });
 
 const db = admin.firestore();
-
-interface CalcRequest {
-  entityId: string;
-  planId: string;
-  versionId: string;
-}
-
-const divDeptLevelsOnly = ['dept', 'div'] as const;
-const allAccountLevels = [...divDeptLevelsOnly, 'pnl'] as const;
-const accountTypes = [...allAccountLevels, 'driver'] as const;
-type AccountCalculationType = typeof accountTypes[number];
-type AccountLevel = typeof allAccountLevels[number];
-//type DivDeptLevel = typeof divDeptLevelsOnly[number];
-type TypeToLevelDict = {
-  [k in AccountCalculationType]: AccountLevel;
-};
-const mapTypeToLevel: TypeToLevelDict = {
-  pnl: 'pnl',
-  div: 'div',
-  dept: 'dept',
-  driver: 'dept',
-};
 
 export type PendingAccountByLevel = {
   [k in AccountCalculationType]: AccountWithDependencies[];
@@ -55,6 +42,13 @@ interface AccountComponents {
 
 const versionFullCalc = async (calcRequest: CalcRequest) => {
   try {
+    const versionDocumentReference = db.doc(
+      `entities/${calcRequest.entityId}/plans/${calcRequest.planId}/versions/${calcRequest.versionId}`
+    );
+    console.log('BEGIN CALC');
+    // set calculated to false to protect the version from incremental calc
+    await versionDocumentReference.update({ calculated: false });
+
     // Calculate LABOR
     const entity = await getEntityDetails(calcRequest.entityId);
     const version = await getVersionDetails(calcRequest);
@@ -62,11 +56,14 @@ const versionFullCalc = async (calcRequest: CalcRequest) => {
 
     await determineCalculationDependencies(calcRequest, entity);
     // now start processing
-    await beginFullCalculationProcess(calcRequest);
+    await beginFullCalculationProcess(calcRequest, entity);
 
     // setTimeout(() => {
     //   console.log(`Done with versionFullCalc`);
     // }, 30000);
+
+    // update timestamp and set calculated to true, which will trigger view regeneration
+    await versionDocumentReference.update({ calculated: true, last_updated: admin.firestore.Timestamp.now() });
   } catch (error) {
     console.log(`Error in versionFullCalc: ${error}`);
   }
@@ -74,11 +71,13 @@ const versionFullCalc = async (calcRequest: CalcRequest) => {
 
 const determineCalculationDependencies = async (calcRequest: CalcRequest, entity: entityModel.entityDoc) => {
   // get all pending ROLLUP accounts & its direct dependents
-  const uncalculatedAccounts: PendingAccountByLevel = { dept: [], div: [], pnl: [], driver: [] };
+  const uncalculatedAccounts: PendingAccountByLevel = { dept: [], div: [], group: [], pnl: [], driver: [] };
   await getInitialUncalculatedAccounts(calcRequest, uncalculatedAccounts);
   await getDivDeptRollupChildren(calcRequest, uncalculatedAccounts, entity);
   await getPnlRollupChildren(calcRequest, uncalculatedAccounts);
+  await getGroupChildren(calcRequest, uncalculatedAccounts);
   await getDriverDependentAccounts(calcRequest, uncalculatedAccounts['driver']);
+  console.log(`ALL ACCOUNTS: ${JSON.stringify(uncalculatedAccounts)}`);
   await saveDependenciesToFirestore(uncalculatedAccounts, calcRequest);
 };
 
@@ -103,7 +102,7 @@ const saveDependenciesToFirestore = async (uncalculatedAccounts: PendingAccountB
   }
 };
 
-const beginFullCalculationProcess = async (calcRequest: CalcRequest) => {
+const beginFullCalculationProcess = async (calcRequest: CalcRequest, entity: entityModel.entityDoc) => {
   const accountTypesToCalculate = [...accountTypes];
   const versionCalcDocRef = db.doc(`entities/${calcRequest.entityId}/calcs/${calcRequest.versionId}`);
 
@@ -120,7 +119,7 @@ const beginFullCalculationProcess = async (calcRequest: CalcRequest) => {
           )}]`
         );
       } else {
-        await calculateAccounts(accountType, calcRequest);
+        await calculateAccounts(accountType, calcRequest, entity);
       }
     }
   } while (accountTypesToCalculate.length > 0);
@@ -128,7 +127,11 @@ const beginFullCalculationProcess = async (calcRequest: CalcRequest) => {
   await versionCalcDocRef.delete();
 };
 
-const calculateAccounts = async (accountType: AccountCalculationType, calcRequest: CalcRequest) => {
+const calculateAccounts = async (
+  accountType: AccountCalculationType,
+  calcRequest: CalcRequest,
+  entity: entityModel.entityDoc
+) => {
   console.log(`Begin calculation of accounts of type [${accountType}] that are ready for calculation`);
   const acctTypeCollRef = db.collection(
     `entities/${calcRequest.entityId}/calcs/${calcRequest.versionId}/${accountType}`
@@ -151,6 +154,7 @@ const calculateAccounts = async (accountType: AccountCalculationType, calcReques
     let dbOpsCounter = 0;
     for (const acctToBeCalculated of acctsReadyForCalc) {
       console.log(`Calculating acct [${acctToBeCalculated}] of type [${accountType}] ...`);
+      await calculateAccount(calcRequest, acctToBeCalculated, accountType, entity);
 
       await removeAccountFromDependencyArrays(acctToBeCalculated, calcRequest);
 
@@ -168,33 +172,30 @@ const calculateAccounts = async (accountType: AccountCalculationType, calcReques
     }
   } while (acctsReadyForCalc.length > 0);
 
-   console.log(`No more accounts of type [${accountType}] can be calculated at this time`);
+  console.log(`No more accounts of type [${accountType}] can be calculated at this time`);
 };
 
-const removeAccountFromDependencyArrays = async (
-  calculatedAccountId: string,
-  calcRequest: CalcRequest
-) => {
+const removeAccountFromDependencyArrays = async (calculatedAccountId: string, calcRequest: CalcRequest) => {
   console.log(`Removing acct [${calculatedAccountId}] from all dependencies`);
 
   const versionCalcDocRef = db.doc(`entities/${calcRequest.entityId}/calcs/${calcRequest.versionId}`);
 
   let firestoreBatch = db.batch();
   let dbOpsCounter = 0;
-  for(const acctType of accountTypes) {
+  for (const acctType of accountTypes) {
     const query = versionCalcDocRef.collection(acctType).where('precedents', 'array-contains', calculatedAccountId);
     const dependentAcctCollSnap = await query.get();
-    for(const depAcctDoc of dependentAcctCollSnap.docs) {
+    for (const depAcctDoc of dependentAcctCollSnap.docs) {
       firestoreBatch.update(depAcctDoc.ref, 'precedents', admin.firestore.FieldValue.arrayRemove(calculatedAccountId));
       dbOpsCounter++;
     }
-    if(dbOpsCounter > 450) {
+    if (dbOpsCounter > 450) {
       await firestoreBatch.commit();
       firestoreBatch = db.batch();
       dbOpsCounter = 0;
     }
   }
-  if(dbOpsCounter > 0) {
+  if (dbOpsCounter > 0) {
     await firestoreBatch.commit();
   }
 };
@@ -210,9 +211,11 @@ const getInitialUncalculatedAccounts = async (
         `entities/${calcRequest.entityId}/plans/${calcRequest.planId}/versions/${calcRequest.versionId}/${mapTypeToLevel[rollupType]}`
       );
       if (rollupType === 'dept') {
-        query = query.where('class', '==', 'rollup');
+        query = query.where('class', '==', 'rollup').where('group', '==', false);
       } else if (rollupType === 'driver') {
         query = query.where('calc_type', '==', 'driver');
+      } else if (rollupType === 'group') {
+        query = query.where('group', '==', true);
       }
       const rollupCollectionSnapshot = await query.get();
       for (const rollupDocument of rollupCollectionSnapshot.docs) {
@@ -257,6 +260,30 @@ const getDivDeptRollupChildren = async (
 
         rollupAccountWithDependents.dependentAccounts.push(accountDocument.id);
       }
+    }
+  }
+};
+
+const getGroupChildren = async (calcRequest: CalcRequest, uncalculatedRollups: PendingAccountByLevel) => {
+  const versionDocumentReference = db.doc(
+    `entities/${calcRequest.entityId}/plans/${calcRequest.planId}/versions/${calcRequest.versionId}`
+  );
+
+  for (const rollupAccountWithDependents of uncalculatedRollups['group']) {
+    const groupDocumentSnapshot = await versionDocumentReference
+      .collection('dept')
+      .doc(rollupAccountWithDependents.fullAccountId)
+      .get();
+
+    if (!groupDocumentSnapshot.exists) {
+      throw new Error(`Group document not found in collection: ${rollupAccountWithDependents.fullAccountId}`);
+    }
+
+    const groupAccount = groupDocumentSnapshot.data() as planModel.accountDoc;
+    if (groupAccount.group_children) {
+      rollupAccountWithDependents.dependentAccounts = rollupAccountWithDependents.dependentAccounts.concat(
+        groupAccount.group_children
+      );
     }
   }
 };
@@ -431,7 +458,7 @@ const getVersionDetails = async (calcRequest: CalcRequest): Promise<planModel.ve
   return versionDocument.data() as planModel.versionDoc;
 };
 
-export const testRollupHierarchy = functions.runWith({timeoutSeconds: 300}).https.onCall(async (data, context) => {
+export const testRollupHierarchy = functions.runWith({ timeoutSeconds: 540 }).https.onCall(async (data, context) => {
   try {
     console.log(`Processing request with values: ${JSON.stringify(data)}`);
     await versionFullCalc(data);
@@ -440,13 +467,16 @@ export const testRollupHierarchy = functions.runWith({timeoutSeconds: 300}).http
   }
 });
 
-export const testRollupHierarchyRequest = functions.runWith({timeoutSeconds: 300}).https.onRequest(async (request, response) => {
-  cors(request, response, async () => {
-    try {
-      console.log(`Processing request with values: ${JSON.stringify(request.body)}`);
-      await versionFullCalc(request.body);
-    } catch (error) {
-      console.log(`Error occured`);
-    }
+export const testRollupHierarchyRequest = functions
+  .runWith({ timeoutSeconds: 540 })
+  .https.onRequest(async (request, response) => {
+    cors(request, response, async () => {
+      try {
+        console.log(`Processing request with values: ${JSON.stringify(request.body)}`);
+        await versionFullCalc(request.body);
+        response.status(200).send();
+      } catch (error) {
+        console.log(`Error occured`);
+      }
+    });
   });
-});

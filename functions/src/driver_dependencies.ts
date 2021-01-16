@@ -8,7 +8,7 @@ const db = admin.firestore();
 
 export async function driverDependencyBuild(
   context_params: driver_model.driverParamsAll,
-  driver_lst: driver_model.driverEntry[],
+  driver_lst: driver_model.DriverEntry[],
   driver_params: driver_model.driverParamsAll
 ) {
   try {
@@ -55,7 +55,7 @@ export async function driverDependencyBuild(
     /***** 2. PROCEED WITH DEPENDENCY BUILD *****/
 
     // remove static driver values from list so we only have accounts
-    const driver_accts: driver_model.driverEntry[] = driver_lst.filter((driver_entry) => {
+    const driver_accts: driver_model.DriverEntry[] = driver_lst.filter((driver_entry) => {
       return driver_entry.type === "acct";
     });
 

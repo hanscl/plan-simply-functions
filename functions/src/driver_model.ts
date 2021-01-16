@@ -15,13 +15,13 @@ export interface driverAcct {
   id: string;
 }
 
-export interface driverEntry {
+export interface DriverEntry {
   type: ("acct" | "value");
   entry: number[] | driverAcct;
 }
 
 export interface acctDriverDef {
-  drivers: driverEntry[];
+  drivers: DriverEntry[];
   operations: ("add" | "sub" | "mlt" | "dvs" | "pct")[];
   ref_accts?: string[]; 
   comments?: string;
