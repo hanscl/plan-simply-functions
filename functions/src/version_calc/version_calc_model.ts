@@ -21,3 +21,9 @@ export const mapTypeToLevel: TypeToLevelDict = {
   group: 'dept',
 };
 
+export interface AccountTotal {
+  acctId: string;
+  values: number[];
+  total: number;
+}
+

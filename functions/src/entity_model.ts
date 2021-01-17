@@ -7,7 +7,7 @@ export interface entityDoc {
   div_account: string;
   full_account_export: string;
   acct_type_flip_sign?: string[];
-  type: string;
+  type: 'entity' | 'rollup';
   entity_embeds?: entityEmbed[];
   labor_settings: LaborSettings;
 }

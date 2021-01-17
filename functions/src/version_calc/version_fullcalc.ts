@@ -1,12 +1,14 @@
 import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
+
 import * as entityModel from '../entity_model';
-import * as laborModel from '../labor/labor_model';
 import * as planModel from '../plan_model';
 import * as utils from '../utils';
 import * as viewModel from '../view_model';
 import * as driverModel from '../driver_model';
+
 import { calculateAccount } from './calculate_account';
+import { sumUpLaborTotalsFromPositions } from './calculate_labor';
 
 import {
   CalcRequest,
@@ -28,39 +30,27 @@ interface AccountWithDependencies {
   dependentAccounts: string[];
 }
 
-interface AccountTotal {
-  acctId: string;
-  values: number[];
-  total: number;
-}
-
-interface AccountComponents {
-  acctId: string;
-  deptId: string;
-  divId: string;
-}
-
 const versionFullCalc = async (calcRequest: CalcRequest) => {
   try {
     const versionDocumentReference = db.doc(
       `entities/${calcRequest.entityId}/plans/${calcRequest.planId}/versions/${calcRequest.versionId}`
     );
-    console.log('BEGIN CALC');
     // set calculated to false to protect the version from incremental calc
     await versionDocumentReference.update({ calculated: false });
 
-    // Calculate LABOR
+    // get additional information from the database for the recalc process
     const entity = await getEntityDetails(calcRequest.entityId);
     const version = await getVersionDetails(calcRequest);
-    await sumUpLaborTotalsFromPositions(calcRequest, entity, version);
+
+    // Calculate LABOR only for regular entities (not rollups)
+    if (entity.type === 'entity') {
+      await sumUpLaborTotalsFromPositions(calcRequest, entity, version);
+    }
 
     await determineCalculationDependencies(calcRequest, entity);
+
     // now start processing
     await beginFullCalculationProcess(calcRequest, entity);
-
-    // setTimeout(() => {
-    //   console.log(`Done with versionFullCalc`);
-    // }, 30000);
 
     // update timestamp and set calculated to true, which will trigger view regeneration
     await versionDocumentReference.update({ calculated: true, last_updated: admin.firestore.Timestamp.now() });
@@ -72,12 +62,12 @@ const versionFullCalc = async (calcRequest: CalcRequest) => {
 const determineCalculationDependencies = async (calcRequest: CalcRequest, entity: entityModel.entityDoc) => {
   // get all pending ROLLUP accounts & its direct dependents
   const uncalculatedAccounts: PendingAccountByLevel = { dept: [], div: [], group: [], pnl: [], driver: [] };
-  await getInitialUncalculatedAccounts(calcRequest, uncalculatedAccounts);
+  await getInitialUncalculatedAccounts(calcRequest, uncalculatedAccounts, entity);
   await getDivDeptRollupChildren(calcRequest, uncalculatedAccounts, entity);
   await getPnlRollupChildren(calcRequest, uncalculatedAccounts);
   await getGroupChildren(calcRequest, uncalculatedAccounts);
   await getDriverDependentAccounts(calcRequest, uncalculatedAccounts['driver']);
-  console.log(`ALL ACCOUNTS: ${JSON.stringify(uncalculatedAccounts)}`);
+  // console.log(`ALL ACCOUNTS: ${JSON.stringify(uncalculatedAccounts)}`);
   await saveDependenciesToFirestore(uncalculatedAccounts, calcRequest);
 };
 
@@ -153,7 +143,7 @@ const calculateAccounts = async (
     let firestoreBatch = db.batch();
     let dbOpsCounter = 0;
     for (const acctToBeCalculated of acctsReadyForCalc) {
-      console.log(`Calculating acct [${acctToBeCalculated}] of type [${accountType}] ...`);
+      // console.log(`Calculating acct [${acctToBeCalculated}] of type [${accountType}] ...`);
       await calculateAccount(calcRequest, acctToBeCalculated, accountType, entity);
 
       await removeAccountFromDependencyArrays(acctToBeCalculated, calcRequest);
@@ -176,7 +166,7 @@ const calculateAccounts = async (
 };
 
 const removeAccountFromDependencyArrays = async (calculatedAccountId: string, calcRequest: CalcRequest) => {
-  console.log(`Removing acct [${calculatedAccountId}] from all dependencies`);
+  // console.log(`Removing acct [${calculatedAccountId}] from all dependencies`);
 
   const versionCalcDocRef = db.doc(`entities/${calcRequest.entityId}/calcs/${calcRequest.versionId}`);
 
@@ -202,14 +192,22 @@ const removeAccountFromDependencyArrays = async (calculatedAccountId: string, ca
 
 const getInitialUncalculatedAccounts = async (
   calcRequest: CalcRequest,
-  uncalculatedAccounts: PendingAccountByLevel
+  uncalculatedAccounts: PendingAccountByLevel,
+  entity: entityModel.entityDoc
 ) => {
   try {
     for (const rollupType of accountTypes) {
+      if (rollupType === 'driver' && entity.type === 'rollup') {
+        continue;
+      }
+
+      console.log(`finding accounts`);
+
       let query: FirebaseFirestore.CollectionReference | FirebaseFirestore.Query;
       query = db.collection(
         `entities/${calcRequest.entityId}/plans/${calcRequest.planId}/versions/${calcRequest.versionId}/${mapTypeToLevel[rollupType]}`
       );
+
       if (rollupType === 'dept') {
         query = query.where('class', '==', 'rollup').where('group', '==', false);
       } else if (rollupType === 'driver') {
@@ -217,6 +215,7 @@ const getInitialUncalculatedAccounts = async (
       } else if (rollupType === 'group') {
         query = query.where('group', '==', true);
       }
+
       const rollupCollectionSnapshot = await query.get();
       for (const rollupDocument of rollupCollectionSnapshot.docs) {
         uncalculatedAccounts[rollupType].push({ fullAccountId: rollupDocument.id, dependentAccounts: [] });
@@ -254,8 +253,12 @@ const getDivDeptRollupChildren = async (
       for (const accountDocument of acctCollectionSnapshot.docs) {
         const account = accountDocument.data() as planModel.accountDoc;
 
-        if (account.class === 'acct' && account.calc_type !== 'driver') {
-          continue;
+        if (account.class === 'acct') {
+          if (entity.type === 'rollup') {
+            continue;
+          } else if (entity.type === 'entity' && account.calc_type !== 'driver') {
+            continue;
+          }
         }
 
         rollupAccountWithDependents.dependentAccounts.push(accountDocument.id);
@@ -356,87 +359,6 @@ const getDriverDependentAccounts = async (calcRequest: CalcRequest, uncalculated
         }
       }
     }
-  }
-};
-
-const sumUpLaborTotalsFromPositions = async (
-  calcRequest: CalcRequest,
-  entity: entityModel.entityDoc,
-  version: planModel.versionDoc
-) => {
-  try {
-    // loop through all positions, add wages (and bonus/socialSec for v2) and set account to laborCalc
-    const positionCollectionSnapshot = await db
-      .collection(`entities/${calcRequest.entityId}/labor/${calcRequest.versionId}/positions`)
-      .get();
-    const laborAccountTotals: AccountTotal[] = [];
-    for (const positionDocument of positionCollectionSnapshot.docs) {
-      const position = positionDocument.data() as laborModel.PositionDoc;
-      const acctDivDept = { deptId: position.dept, divId: position.div };
-      addAccountValue({ ...acctDivDept, acctId: position.acct }, laborAccountTotals, position.wages.values, entity);
-
-      // OPTIONAL FOR LABOR MODEL V2
-      if (version.labor_version && version.labor_version > 1) {
-        const acctSocialCmpnts = { ...acctDivDept, acctId: entity.labor_settings.default_accts.socialsec };
-        addAccountValue(acctSocialCmpnts, laborAccountTotals, position.socialsec.values, entity);
-
-        const acctBonusCmpnts = { ...acctDivDept, acctId: entity.labor_settings.default_accts.bonus };
-        if (position.bonus_option !== 'None') {
-          addAccountValue(acctBonusCmpnts, laborAccountTotals, position.bonus.values, entity);
-        }
-      }
-    }
-
-    await updateLaborAccountsInFirestore(calcRequest, laborAccountTotals);
-  } catch (error) {
-    console.log(`Error occured in [sumUpLaborTotalsFromPositions]: ${error}`);
-  }
-};
-
-const updateLaborAccountsInFirestore = async (calcRequest: CalcRequest, laborAccountTotals: AccountTotal[]) => {
-  try {
-    const firestoreBatch = db.batch();
-    let batchCounter = 0;
-    // firstly, calculate Totals
-    laborAccountTotals.map((account) => {
-      account.total = account.values.reduce((a, b) => a + b, 0);
-    });
-    for (const laborAccount of laborAccountTotals) {
-      firestoreBatch.update(
-        db.doc(
-          `entities/${calcRequest.entityId}/plans/${calcRequest.planId}/versions/${calcRequest.versionId}/dept/${laborAccount.acctId}`
-        ),
-        { total: laborAccount.total, values: laborAccount.values, calc_type: 'labor' }
-      );
-      batchCounter++;
-    }
-
-    if (batchCounter > 0) {
-      // TODO: COMMENT IN FIRESTORE BATCH COMMIT
-      // firestoreBatch.commit();
-    }
-  } catch (error) {
-    console.log(`Error occured in [updateLaborAccountsInFirestore]: ${error}`);
-  }
-};
-
-const addAccountValue = (
-  acctCmpnts: AccountComponents,
-  accountList: AccountTotal[],
-  valuesToAdd: number[],
-  entity: entityModel.entityDoc
-) => {
-  const fullAccountString = utils.buildFullAccountString([entity.full_account], {
-    dept: acctCmpnts.deptId,
-    div: acctCmpnts.divId,
-    acct: acctCmpnts.acctId,
-  });
-  // see if account is already in array and add values if found; otherwise add new
-  const filteredAccounts = accountList.filter((acct) => acct.acctId === fullAccountString);
-  if (filteredAccounts.length > 0) {
-    filteredAccounts[0].values = utils.addValuesByMonth(filteredAccounts[0].values, valuesToAdd);
-  } else {
-    accountList.push({ acctId: fullAccountString, values: valuesToAdd, total: 0 });
   }
 };
 

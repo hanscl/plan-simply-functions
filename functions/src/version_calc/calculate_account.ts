@@ -28,9 +28,9 @@ export const calculateAccount = async (
   }
 
   const annualTotal = utils.finRound(monthValuesForAccount.reduce((a, b) => a + b, 0));
-  console.log(
-    `Annual Total for account ${fullAccountId} of type ${acctType} is ${annualTotal}. MONTHLY: ${monthValuesForAccount}`
-  );
+  // console.log(
+  //   `Annual Total for account ${fullAccountId} of type ${acctType} is ${annualTotal}. MONTHLY: ${monthValuesForAccount}`
+  // );
 
   // save account
   const versionDocRef = db.doc(
