@@ -202,8 +202,6 @@ const getInitialUncalculatedAccounts = async (
         continue;
       }
 
-      console.log(`finding accounts`);
-
       let query: FirebaseFirestore.CollectionReference | FirebaseFirestore.Query;
       query = db.collection(
         `entities/${calcRequest.entityId}/plans/${calcRequest.planId}/versions/${calcRequest.versionId}/${mapTypeToLevel[rollupType]}`

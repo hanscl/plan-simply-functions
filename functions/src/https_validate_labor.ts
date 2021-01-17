@@ -61,7 +61,7 @@ export const getLaborValidations = functions.region(config.cloudFuncLoc).https.o
       }
 
       const validation_request = request.body as laborValidationRequest;
-      console.log(`Running itemized entry update for entity ${validation_request.path.entity} and version ${validation_request.version_id}.`);
+      console.log(`Building labor validations for entity ${validation_request.path.entity} and version ${validation_request.version_id}.`);
 
       const dept_list: string[] = [];
       // obtain all depts

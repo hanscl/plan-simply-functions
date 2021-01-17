@@ -32,6 +32,7 @@ const rebuildVersionHierarchy = async (calcRequest: CalcRequest) => {
     const divDict = (await getEntityStructureData(calcRequest.entityId, 'div')) as entityModel.divDict;
     const deptDict = (await getEntityStructureData(calcRequest.entityId, 'dept')) as entityModel.deptDict;
     const acctDict = (await getEntityStructureData(calcRequest.entityId, 'acct')) as entityModel.acctDict;
+
     const rollupSummary = (await getEntityStructureData(
       calcRequest.entityId,
       'rollup'
@@ -50,7 +51,7 @@ const rebuildVersionHierarchy = async (calcRequest: CalcRequest) => {
 
       for (const rollupDocument of rollupDocSnapshot.docs) {
         const rollupData = rollupDocument.data() as entityModel.EntityRollupDocument;
-        processRollupLevel(rollupData, divDict, deptDict, acctDict, rollupSummary.items, versionDocumentReference, [
+        await processRollupLevel(rollupData, divDict, deptDict, acctDict, rollupSummary.items, versionDocumentReference, [
           entity.full_account,
           entity.div_account,
         ]);
@@ -113,7 +114,7 @@ const processRollupLevel = async (
     }
   }
   if (acctList.length > 0) {
-    updateAllAccounts(
+    await updateAllAccounts(
       acctList,
       rollupDefinition,
       divDict,
@@ -240,7 +241,7 @@ const updateRollupAccountsInFirestore = async (
   }
 
   await versionDocRef
-    .collection(deptId ? deptId : divId)
+    .collection(deptId ? 'dept' : 'div')
     .doc(fullAccount)
     .set(finalAcctUpdates);
 };
