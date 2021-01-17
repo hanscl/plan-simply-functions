@@ -2,7 +2,7 @@ import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
 
 import * as entityModel from '../entity_model';
-// import * as planModel from '../plan_model';
+import * as planModel from '../plan_model';
 import * as utils from '../utils';
 // import * as viewModel from '../view_model';
 // import * as driverModel from '../driver_model';
@@ -70,6 +70,44 @@ const processRollupLevel = async (
   versionDocRef: FirebaseFirestore.DocumentReference
 ) => {
   console.log(`processing rollup definition: ${JSON.stringify(rollupDefinition)}`);
+
+  const acctList: planModel.accountDoc[] = [];
+
+  if (rollupDefinition.child_rollups) {
+    const acctDocsSnap = await versionDocRef
+      .collection('dept')
+      .where('acct', 'in', Object.keys(rollupDefinition.child_rollups))
+      .get();
+
+    for (const acctDoc of acctDocsSnap.docs) {
+      const childAccount = acctDoc.data() as planModel.accountDoc;
+
+      childAccount.parent_rollup = {
+        acct: rollupDefinition.rollup,
+        operation: rollupDefinition.child_rollups[childAccount.acct],
+      };
+
+      acctList.push(childAccount);
+    }
+  } else {
+    const acctDocsSnap = await versionDocRef
+      .collection('dept')
+      .where('acct_type', 'in', rollupDefinition.acct_types)
+      .get();
+
+    for (const acctDoc of acctDocsSnap.docs) {
+      const childAccount = acctDoc.data() as planModel.accountDoc;
+
+      let newAcctTotal = 0;
+      if (childAccount.acct_type !== 'STATS') {
+        newAcctTotal = childAccount.values.reduce((a, b) => a + b, 0);
+      }
+      childAccount.parent_rollup = { acct: rollupDefinition.rollup, operation: 1 };
+      childAccount.total = newAcctTotal;
+
+      acctList.push(childAccount);
+    }
+  }
 };
 
 const getEntityStructureData = async (
