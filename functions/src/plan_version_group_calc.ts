@@ -63,7 +63,7 @@ export const planVersionGroupCreate = functions.firestore
 
    // const rollup_definitions = rollup_snap.data() as Record<string, string>;
       
-      const rollup_doc = rollup_snap.data() as entity_model.rollupSummaryDoc
+      const rollup_doc = rollup_snap.data() as entity_model.RollupSummaryDoc
       const rollup_list: string[] = [];
       rollup_doc.items.forEach(rollupNameMap => rollup_list.push(rollupNameMap.code));
 

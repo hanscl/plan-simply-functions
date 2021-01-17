@@ -9,6 +9,7 @@ import * as driverModel from '../driver_model';
 
 import { calculateAccount } from './calculate_account';
 import { sumUpLaborTotalsFromPositions } from './calculate_labor';
+import { getEntityDetails, getVersionDetails} from './version_calc_helpers';
 
 import {
   CalcRequest,
@@ -39,8 +40,8 @@ const versionFullCalc = async (calcRequest: CalcRequest) => {
     await versionDocumentReference.update({ calculated: false });
 
     // get additional information from the database for the recalc process
-    const entity = await getEntityDetails(calcRequest.entityId);
-    const version = await getVersionDetails(calcRequest);
+    const entity = await getEntityDetails(db, calcRequest.entityId);
+    const version = await getVersionDetails(db, calcRequest);
 
     // Calculate LABOR only for regular entities (not rollups)
     if (entity.type === 'entity') {
@@ -360,24 +361,6 @@ const getDriverDependentAccounts = async (calcRequest: CalcRequest, uncalculated
       }
     }
   }
-};
-
-const getEntityDetails = async (entityId: string): Promise<entityModel.entityDoc> => {
-  const entityDocument = await db.doc(`entities/${entityId}`).get();
-  if (!entityDocument.exists) {
-    throw new Error(`Entity Doc not found at getEntityDetails => This should never happen`);
-  }
-  return entityDocument.data() as entityModel.entityDoc;
-};
-
-const getVersionDetails = async (calcRequest: CalcRequest): Promise<planModel.versionDoc> => {
-  const versionDocument = await db
-    .doc(`entities/${calcRequest.entityId}/plans/${calcRequest.planId}/versions/${calcRequest.versionId}`)
-    .get();
-  if (!versionDocument.exists) {
-    throw new Error(`Version Doc not found at getVersionDetails => This should never happen`);
-  }
-  return versionDocument.data() as planModel.versionDoc;
 };
 
 export const testRollupHierarchy = functions.runWith({ timeoutSeconds: 540 }).https.onCall(async (data, context) => {

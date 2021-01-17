@@ -88,7 +88,7 @@ export const importAccountsFromCsv = functions.storage.object().onFinalize(async
       // load rollup document
       const rollup_snap = await db.doc(`entities/${entity_doc.id}/entity_structure/rollup`).get();
       if (!rollup_snap.exists) throw new Error("Rollup document does not exist for this entity - EXITING");
-      const rollup_name_dicts = (rollup_snap.data() as entity_model.rollupSummaryDoc).items;
+      const rollup_name_dicts = (rollup_snap.data() as entity_model.RollupSummaryDoc).items;
 
       const acct_dict: entity_model.acctDict = {};
 

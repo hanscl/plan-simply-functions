@@ -84,7 +84,7 @@ export interface EntityRollupDocument {
   accts_remove?: string[];
 }
 
-export interface rollupSummaryDoc {
+export interface RollupSummaryDoc {
   name: string;
   max_level: number;
   items: rollupNameMap[];

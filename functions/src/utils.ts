@@ -119,6 +119,15 @@ export function substituteEntityForRollup(origText: string, embed_maps: entity_m
   return "";
 }
 
+export async function deleteDocumentsByQuery(documentQuery: FirebaseFirestore.Query, batchSize: number) {
+  const query = documentQuery.limit(batchSize);
+
+  return new Promise((resolve, reject) => {
+    deleteQueryBatch(query, resolve).catch(reject);
+  });
+}
+
+
 export async function deleteCollection(collectionRef: FirebaseFirestore.CollectionReference<FirebaseFirestore.DocumentData>, batchSize: number) {
   const query = collectionRef.orderBy("__name__").limit(batchSize);
 
