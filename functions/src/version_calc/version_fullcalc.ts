@@ -364,6 +364,7 @@ const getDriverDependentAccounts = async (calcRequest: CalcRequest, uncalculated
 export const testRollupHierarchy = functions.runWith({ timeoutSeconds: 540 }).https.onCall(async (data, context) => {
   try {
     console.log(`Processing request with values: ${JSON.stringify(data)}`);
+    console.log(`Context: ${JSON.stringify(context.auth)}`);
     await versionFullCalc(data);
   } catch (error) {
     console.log(`Error occured`);

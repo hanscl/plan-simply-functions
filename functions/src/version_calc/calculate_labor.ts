@@ -1,7 +1,6 @@
 import * as admin from 'firebase-admin';
 
-import { CalcRequest } from './version_calc_model';
-import { AccountTotal } from './version_calc_model';
+import { CalcRequest, AccountTotal } from './version_calc_model';
 
 import * as entityModel from '../entity_model';
 import * as planModel from '../plan_model';

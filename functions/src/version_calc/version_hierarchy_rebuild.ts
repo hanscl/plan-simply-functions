@@ -260,6 +260,7 @@ const getEntityStructureData = async (
 export const testHierarchyRebuild = functions.runWith({ timeoutSeconds: 540 }).https.onCall(async (data, context) => {
   try {
     console.log(`Processing hierarchy rebuild with values: ${JSON.stringify(data)}`);
+    console.log(`Context: ${JSON.stringify(context.auth)}`);
     await rebuildVersionHierarchy(data);
   } catch (error) {
     console.log(`Error occured`);
