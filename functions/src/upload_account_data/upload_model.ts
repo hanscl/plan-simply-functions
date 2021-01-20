@@ -23,3 +23,10 @@ export interface UploadTemplateCsv {
     period_11?: number;
     period_12?: number;
 }
+
+export interface UploadAccountDataRequest {
+    entityId: string;
+    planId: string;
+    versionId: string;
+    data: UploadTemplateCsv[];
+}
