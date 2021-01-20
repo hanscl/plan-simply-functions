@@ -6,6 +6,7 @@ const db = admin.firestore();
 
 export const beginRollVersion = async (rollVersionRequest: RollVersionRequest) => {
   try {
+    console.log(db.settings);
   } catch (error) {
     throw new Error(`Error occured in [beginRollVersion]: ${error}`);
   }
