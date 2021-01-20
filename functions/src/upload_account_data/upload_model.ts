@@ -24,9 +24,19 @@ export interface UploadTemplateCsv {
     period_12?: number;
 }
 
+export interface AccountDataRow {
+    company: string;
+    cost_center: string;
+    gl_acct: string;
+    gl_name: string;
+    full_account: string;
+    values: number[]; // must be length = 12 
+}
+
+
 export interface UploadAccountDataRequest {
     entityId: string;
     planId: string;
     versionId: string;
-    data: UploadTemplateCsv[];
+    data: AccountDataRow[];
 }

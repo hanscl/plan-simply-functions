@@ -1,10 +1,10 @@
 import * as admin from 'firebase-admin';
 
-import { UploadAccountDataRequest } from './upload_model';
+import { AccountDataRow } from './upload_model';
 
 const db = admin.firestore();
 
-export const validateUploadedData = async (uploadDataRequest: UploadAccountDataRequest) => {
+export const validateUploadedData = async (uploadDataRequest: AccountDataRow) => {
     
     try {// check that accounts exist
     // return success or failure

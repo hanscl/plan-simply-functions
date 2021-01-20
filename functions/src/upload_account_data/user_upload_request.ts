@@ -3,7 +3,7 @@ import * as admin from 'firebase-admin';
 import * as httpsUtils from '../https_utils';
 import * as config from '../config';
 
-import { UploadAccountDataRequest } from './upload_model';
+import { AccountDataRow, UploadAccountDataRequest } from './upload_model';
 import { validateUploadedData } from './insert_data_into_version';
 
 const cors = require('cors')({ origin: true });
@@ -49,7 +49,7 @@ export const requestUploadDataToVersion = functions
           return;
         }
 
-        const uploadDataRequest = request.body as UploadAccountDataRequest;
+        const uploadDataRequest = request.body as AccountDataRow;
 
         validateUploadedData(uploadDataRequest);
       } catch (error) {
