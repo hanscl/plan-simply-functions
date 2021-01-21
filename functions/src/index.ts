@@ -54,4 +54,4 @@ export { testRollupHierarchy } from './version_calc/version_fullcalc';
 export { testRollupHierarchyRequest } from './version_calc/version_fullcalc';
 export { testHierarchyRebuild } from './version_calc/version_hierarchy_rebuild';
 
-export { requestUploadTemplate } from './upload_actuals/user_template_request';
+export { requestUploadTemplate } from './upload_account_data/user_template_request';
