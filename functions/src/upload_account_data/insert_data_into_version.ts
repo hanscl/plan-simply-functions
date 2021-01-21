@@ -5,12 +5,11 @@ import { AccountDataRow } from './upload_model';
 const db = admin.firestore();
 
 export const validateUploadedData = async (uploadDataRequest: AccountDataRow) => {
-    
-    try {// check that accounts exist
+  try {
+    // check that accounts exist
     // return success or failure
-    
-    }
-    catch(error) {
-        throw new Error(`Error occured in [validateUploadedData]: ${error}`);
-    }
-}
+    console.log(db.settings);
+  } catch (error) {
+    throw new Error(`Error occured in [validateUploadedData]: ${error}`);
+  }
+};
