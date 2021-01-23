@@ -3,7 +3,7 @@ import * as admin from 'firebase-admin';
 import * as httpsUtils from '../utils/https_utils';
 import * as config from '../config';
 
-import { AccountDataRow } from './upload_model';
+import { UploadAccountDataRequest } from './upload_model';
 import { validateUploadedData } from './insert_data_into_version';
 
 const cors = require('cors')({ origin: true });
@@ -49,12 +49,12 @@ export const requestUploadDataToVersion = functions
           return;
         }
 
-        const uploadDataRequest = request.body as AccountDataRow;
+        const uploadDataRequest = request.body as UploadAccountDataRequest;
 
         await validateUploadedData(uploadDataRequest);
       } catch (error) {
         console.log(`Error occured while processing data upload: ${error}`);
-        response.status(500).send({ result: `Error occured while processing data upload. Please contact support` });
+        response.status(500).send({ result: `Unable to upload data: ${error}` });
       }
     });
   });
