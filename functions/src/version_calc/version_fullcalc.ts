@@ -1,11 +1,13 @@
 import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
+import * as config from '../config';
 
 import * as entityModel from '../entity_model';
 import * as planModel from '../plan_model';
 import * as utils from '../utils/utils';
 import * as viewModel from '../view_model';
 import * as driverModel from '../driver_model';
+import { verifyCloudTaskRequest } from '../utils/https_utils';
 
 import { calculateAccount } from './calculate_account';
 import { sumUpLaborTotalsFromPositions } from './calculate_labor';
@@ -384,3 +386,25 @@ export const testRollupRecalcRequest = functions
       }
     });
   });
+
+
+  export const versionFullCalcGCT = functions.region(config.cloudFuncLoc).https.onRequest(async (request, response) => {
+    try {
+      // Verify the request
+      await verifyCloudTaskRequest(request, "version-fullcalc-async");
+  
+      // get the request body
+  
+      const calcReq = request.body as CalcRequest;
+  
+      console.log(`Running versionFullCalcGCT with parameters: ${JSON.stringify(calcReq)}`);
+
+      await versionFullCalc(calcReq);
+
+      response.status(200).send({ result: `full calc completed` });
+    } catch (error) {
+      console.log(`Error occured while requesting versionFullCalcGCT: ${error}. This should be retried.`);
+      response.status(500).send({ result: `Could not execute versionFullCalcGCT. Please contact support` });
+    }
+  });
+  

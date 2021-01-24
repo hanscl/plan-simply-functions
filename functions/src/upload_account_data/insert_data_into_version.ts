@@ -1,57 +1,68 @@
 import * as admin from 'firebase-admin';
-import {dispatchGCloudTask} from '../gcloud_task_dispatch';
-
 import { accountDoc } from '../plan_model';
 
-import { UploadAccountDataRequest } from './upload_model';
+import { AccountDataRow, UploadAccountDataRequest } from './upload_model';
 
 const db = admin.firestore();
 
-export const validateUploadedData = async (uploadDataRequest: UploadAccountDataRequest) => {
+type AcctCheck = {
+    fullAccount: string;
+    calcType?: 'entry' | 'driver' | 'labor' | 'entity_rollup';
+}
+
+export const insertDataIntoVersion = async (uploadDataRequest: UploadAccountDataRequest) => {
   try {
-    const versionDocRef = db.doc(
+    const versionRef = db.doc(
       `entities/${uploadDataRequest.entityId}/plans/${uploadDataRequest.planId}/versions/${uploadDataRequest.versionId}`
     );
-    const nLevelAccountQuerySnap = await versionDocRef.collection(`dept`).where('class', '==', 'acct').get();
 
-    const validAccounts: string[] = [];
-    for (const nLevelAccountDoc of nLevelAccountQuerySnap.docs) {
-      validAccounts.push((nLevelAccountDoc.data() as accountDoc).full_account);
+    const laborPosRef = db.doc(`entities/${uploadDataRequest.entityId}/labor/${uploadDataRequest.versionId}`);
+    const driverRef = db.doc(`entities/${uploadDataRequest.entityId}/drivers/${uploadDataRequest.versionId}`);
+
+
+    const existingNLevelAccounts: AcctCheck[] = [];
+    const acctSnap = await versionRef.collection('dept').where('class', '==', 'acct').get();
+    for (const acct of acctSnap.docs) {
+      const acctData = acct.data() as accountDoc;
+      existingNLevelAccounts.push({ fullAccount: acctData.full_account, calcType: acctData.calc_type });
     }
 
-    // make sure all accounts are valid
-    const invalidAccounts = uploadDataRequest.data.filter(
-      (accountRow) => !validAccounts.includes(accountRow.full_account)
-    );
+    await db.runTransaction(async (firestoreTxRef) => {
+      const versionDoc = await firestoreTxRef.get(versionRef);
 
-    if (invalidAccounts.length > 0) {
-      throw new Error(
-        `Upload attempt aborted. The following accounts do not exist in the plan: ${JSON.stringify(
-          invalidAccounts.map((acct) => acct.full_account)
-        )}`
-      );
-    }
-
-    // confirm that all values are numbers
-    const nanAccountRows = uploadDataRequest.data.filter(
-      (accountRow) => !accountRow.values.every((val) => !isNaN(val))
-    );
-
-    if (nanAccountRows.length > 0) {
-      throw new Error(
-        `Upload attempt aborted. The following accounts do not exist in the plan: ${JSON.stringify(
-          invalidAccounts.map((acct) => acct.full_account)
-        )}`
-      );
-    }
-
-    // we're good, let's upload => schedule the cloud tasks
-     await dispatchGCloudTask(recalcReq, 'version-rollup-recalc', 'recalc');
-
-    // check that accounts exist
-    // return success or failure
-    console.log(db.settings);
+      for (const acctDataRow of uploadDataRequest.data) {
+        await processAccountRow(firestoreTxRef, acctDataRow, existingNLevelAccounts, versionRef, laborPosRef, driverRef);
+      }
+      // write to version document to ensure that the transaction is atomic until here
+      const tsNow = admin.firestore.Timestamp.now();
+      firestoreTxRef.update(versionDoc.ref, { last_updated: tsNow });
+    });
   } catch (error) {
-    throw new Error(`Error occured in [validateUploadedData]: ${error}`);
+    throw new Error(`Error occured in [insertDataIntoVersion]: ${error}`);
   }
+};
+
+const processAccountRow = async (
+  firestoreTx: FirebaseFirestore.Transaction,
+  accountDataRow: AccountDataRow,
+  existingNLevelAccts: AcctCheck[],
+  versionRef: FirebaseFirestore.DocumentReference,
+  laborPosRef: FirebaseFirestore.DocumentReference,
+  driverRef: FirebaseFirestore.DocumentReference
+) => {
+    const acctRef =  versionRef.collection('dept').doc(accountDataRow.full_account);
+    const  existAcctFiltered = existingNLevelAccts.filter(acct => acct.fullAccount === accountDataRow.full_account);
+    if(existAcctFiltered.length === 1) {
+        if(existAcctFiltered[0].calcType === 'driver') {
+            firestoreTx.delete(driverRef.collection('dept').doc(accountDataRow.full_account));     
+        }
+        else if(existAcctFiltered[0].calcType === 'labor') {
+            const allPositionsForAccoutSnap = await laborPosRef.collection('positions').where('acct', '==', accountDataRow.full_account).get();
+            for(const positionDoc of allPositionsForAccoutSnap.docs) {
+                firestoreTx.delete(positionDoc.ref);
+            }
+        }
+        firestoreTx.update(acctRef, 'calc_type', 'entry');
+    } 
+    firestoreTx.update(acctRef, 'values', accountDataRow.values);
 };
