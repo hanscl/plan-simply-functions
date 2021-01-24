@@ -7,9 +7,11 @@ const db = admin.firestore();
 
 export const validateUploadedData = async (uploadDataRequest: UploadAccountDataRequest) => {
   try {
+    console.log(`entities/${uploadDataRequest.entityId}/plans/${uploadDataRequest.planId}/versions/${uploadDataRequest.versionId}`);
     const versionDocRef = db.doc(
       `entities/${uploadDataRequest.entityId}/plans/${uploadDataRequest.planId}/versions/${uploadDataRequest.versionId}`
     );
+
     const nLevelAccountQuerySnap = await versionDocRef.collection(`dept`).where('class', '==', 'acct').get();
 
     const validAccounts: string[] = [];
@@ -26,6 +28,7 @@ export const validateUploadedData = async (uploadDataRequest: UploadAccountDataR
     const invalidAccounts = uploadDataRequest.data.filter(
       (accountRow) => !validAccounts.includes(accountRow.full_account)
     );
+
 
     if (invalidAccounts.length > 0) {
       return {

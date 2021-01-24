@@ -54,8 +54,8 @@ export const validateDataToUploadIntoVersion = functions
         const returnResult = await validateUploadedData(uploadDataRequest);
         response.status(200).send(returnResult);
       } catch (error) {
-        console.log(`Error occured while processing data upload: ${error}`);
-        response.status(500).send({ result: 'ERROR', message: `Unable to upload data: ${error}` });
+        console.log(`Error occured while validating data: ${error}`);
+        response.status(500).send({ result: 'ERROR', message: `Data is not valid for upload: ${error}` });
       }
     });
   });

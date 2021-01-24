@@ -4,15 +4,15 @@ import * as httpsUtils from '../utils/https_utils';
 import * as config from '../config';
 
 import { UploadAccountDataRequest } from './upload_model';
-import { insertDataIntoVersion } from './insert_data_into_version'
-import { dispatchGCloudTask } from '../gcloud_task_dispatch'
+import { insertDataIntoVersion } from './insert_data_into_version';
+import { dispatchGCloudTask } from '../gcloud_task_dispatch';
 
 const cors = require('cors')({ origin: true });
 
 const db = admin.firestore();
 
 export const requestUploadDataToVersion = functions
-  .runWith({timeoutSeconds: 360})
+  .runWith({ timeoutSeconds: 360 })
   .region(config.cloudFuncLoc)
   .https.onRequest(async (request, response) => {
     cors(request, response, async () => {
@@ -52,17 +52,26 @@ export const requestUploadDataToVersion = functions
         }
 
         const uploadDataRequest = request.body as UploadAccountDataRequest;
-       
+
         await insertDataIntoVersion(uploadDataRequest);
 
-        const {entityId, planId, versionId} = uploadDataRequest;
+        const { entityId, planId, versionId } = uploadDataRequest;
 
         // schedule the cloud task
-       await dispatchGCloudTask({entityId: entityId, planId: planId, versionId: versionId}, 'version-fullcalc-async', 'recalc');
-
+        await dispatchGCloudTask(
+          { entityId: entityId, planId: planId, versionId: versionId },
+          'version-fullcalc-async',
+          'recalc'
+        );
+        response
+          .status(200)
+          .send({
+            status: 'OK',
+            message: 'Data uploaded successfully. Version calculation will be completed within 1-2 minutes',
+          });
       } catch (error) {
         console.log(`Error occured while processing data upload: ${error}`);
-        response.status(500).send({ result: `Unable to upload data: ${error}` });
+        response.status(500).send({ status: 'ERROR', message: `Unable to upload data: ${error}` });
       }
     });
   });
