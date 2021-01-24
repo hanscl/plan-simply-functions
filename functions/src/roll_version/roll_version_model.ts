@@ -7,7 +7,17 @@ export interface RollVersionRequest {
   entityId?: string;
 }
 
-interface PlanVersion {
+export interface PlanVersion {
   planName: string;
   versionName: string;
+}
+
+interface CompanyPlanDefinition {
+  name: string;
+  type: string;
+  versions: string[];
+}
+
+export interface CompanyPlanDocment {
+  plans: CompanyPlanDefinition[];
 }

@@ -3,11 +3,14 @@ import { versionDoc, planVersionCalendar } from '../plan_model';
 import { deleteCollection, initializeVersionLockObject } from '../utils/utils';
 import { completeRebuildAndRecalcVersion } from '../version_complete_rebuild';
 import { RollVersionRequest } from './roll_version_model';
+import { PlanVersion, CompanyPlanDocment } from './roll_version_model';
 
 const db = admin.firestore();
 
 export const beginRollVersion = async (rollVersionRequest: RollVersionRequest, recalcNewVersion: boolean) => {
   try {
+    await updateCompanyPlanVersionMaster(rollVersionRequest.targetPlanVersion);
+
     let query = db.collection(`entities`).where('type', '==', 'entity');
     if (rollVersionRequest.entityId) {
       query = query.where(admin.firestore.FieldPath.documentId(), '==', rollVersionRequest.entityId);
@@ -157,14 +160,12 @@ const prepareVersionDocumentForNewData = async (
     }
   }
 
-  console.log(`VERSION REF`, sourceVersionRef);
   const versionSnap = await sourceVersionRef.get();
   if (!versionSnap.exists) {
     throw new Error(`Version doc not found in [prepareVersionDocumentForNewData]`);
   }
 
   const versionDoc = versionSnap.data() as versionDoc;
-  console.log('VERSION:', JSON.stringify(versionDoc));
   let calendarConfig = versionSnap.data() as planVersionCalendar;
   
 
@@ -175,8 +176,6 @@ const prepareVersionDocumentForNewData = async (
     }
     calendarConfig = planSnap.data() as planVersionCalendar;
   }
-
-  console.log('CALENDAR:', JSON.stringify(calendarConfig));
 
   const versionFieldUpdates = {
     last_updated: admin.firestore.Timestamp.now(),
@@ -260,5 +259,28 @@ const resetAccountCalcFlag = async (versionRef: FirebaseFirestore.DocumentRefere
   const acctQuerySnap = await versionRef.collection('dept').where('calc_type', '==', calcType).get();
   for (const acctDoc of acctQuerySnap.docs) {
     acctDoc.ref.update({ calc_type: 'entry' });
+  }
+};
+
+const updateCompanyPlanVersionMaster = async (newPlanVersion: PlanVersion) => {
+  const companyPlanSnap = await db.doc(`company_structure/company_plans`).get();
+  if(!companyPlanSnap.exists) {
+    throw new Error('No plans defined for this company. This error is fatal. please check the database structure.');
+  }
+
+  const companyPlans = companyPlanSnap.data() as CompanyPlanDocment;
+
+  const filteredPlans = companyPlans.plans.filter(plan => plan.name === newPlanVersion.planName);
+  if(filteredPlans.length === 0) {
+    throw new Error('Invalid target plan selected.');
+  
+  }
+
+  const selectedPlan = filteredPlans[0];
+
+  if(!selectedPlan.versions.includes(newPlanVersion.versionName)) {
+    selectedPlan.versions.push(newPlanVersion.versionName);
+
+    await db.doc(`company_structure/company_plans`).update('plans', companyPlans.plans);
   }
 };

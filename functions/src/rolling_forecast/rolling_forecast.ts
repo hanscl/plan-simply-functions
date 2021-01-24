@@ -51,11 +51,6 @@ export const beginRollingForecast = async (rollingForecastRequest: RollingForeca
   }
 };
 
-// const shiftArrayWithSeedValue(values: number[], seedIndex: number) {
-//   values.push(values[seedIndex]);
-//   values.shift()
-// }
-
 const updateDrivers = async (entityId: string, versionId: string, seedMonth: number) => {
   const batch = db.batch();
 
