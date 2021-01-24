@@ -361,7 +361,7 @@ const getDriverDependentAccounts = async (calcRequest: CalcRequest, uncalculated
   }
 };
 
-export const testRollupHierarchy = functions.runWith({ timeoutSeconds: 540 }).https.onCall(async (data, context) => {
+export const testRollupRecalcOnCall = functions.runWith({ timeoutSeconds: 540 }).https.onCall(async (data, context) => {
   try {
     console.log(`Processing request with values: ${JSON.stringify(data)}`);
     console.log(`Context: ${JSON.stringify(context.auth)}`);
@@ -371,7 +371,7 @@ export const testRollupHierarchy = functions.runWith({ timeoutSeconds: 540 }).ht
   }
 });
 
-export const testRollupHierarchyRequest = functions
+export const testRollupRecalcRequest = functions
   .runWith({ timeoutSeconds: 540 })
   .https.onRequest(async (request, response) => {
     cors(request, response, async () => {

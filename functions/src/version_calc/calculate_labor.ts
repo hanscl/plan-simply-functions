@@ -6,6 +6,8 @@ import * as entityModel from '../entity_model';
 import * as planModel from '../plan_model';
 import * as laborModel from '../labor/labor_model';
 import * as utils from '../utils/utils';
+import * as laborCalc from '../labor/labor_calc';
+import {getBeginYearAndMonth} from '../utils/version_calendar';
 
 interface AccountComponents {
   acctId: string;
@@ -21,13 +23,18 @@ export const sumUpLaborTotalsFromPositions = async (
   version: planModel.versionDoc
 ) => {
   try {
-    // loop through all positions, add wages (and bonus/socialSec for v2) and set account to laborCalc
+        // loop through all positions, add wages (and bonus/socialSec for v2) and set account to laborCalc
     const positionCollectionSnapshot = await db
       .collection(`entities/${calcRequest.entityId}/labor/${calcRequest.versionId}/positions`)
       .get();
     const laborAccountTotals: AccountTotal[] = [];
+    console.log(`entities/${calcRequest.entityId}/labor/${calcRequest.versionId}/positions`);
+    console.log(JSON.stringify(positionCollectionSnapshot));
     for (const positionDocument of positionCollectionSnapshot.docs) {
       const position = positionDocument.data() as laborModel.PositionDoc;
+      // refresh the position
+      await recalculateLaborPosition(positionDocument.ref, position, calcRequest, entity);
+
       const acctDivDept = { deptId: position.dept, divId: position.div };
       addAccountValue({ ...acctDivDept, acctId: position.acct }, laborAccountTotals, position.wages.values, entity);
 
@@ -72,6 +79,7 @@ const addAccountValue = (
 
 const updateLaborAccountsInFirestore = async (calcRequest: CalcRequest, laborAccountTotals: AccountTotal[]) => {
     try {
+      console.log('UPDATING LABOR ACCOUNTS:', JSON.stringify(laborAccountTotals));
       const firestoreBatch = db.batch();
       let batchCounter = 0;
       // firstly, calculate Totals
@@ -90,9 +98,48 @@ const updateLaborAccountsInFirestore = async (calcRequest: CalcRequest, laborAcc
   
       if (batchCounter > 0) {
         // TODO: COMMENT IN FIRESTORE BATCH COMMIT
-        // firestoreBatch.commit();
+        firestoreBatch.commit();
       }
     } catch (error) {
       console.log(`Error occured in [updateLaborAccountsInFirestore]: ${error}`);
     }
   };
+
+  const recalculateLaborPosition = async(positionDocRef: FirebaseFirestore.DocumentReference, position: laborModel.PositionDoc, calcRequest: CalcRequest, entity: entityModel.entityDoc) => {
+
+    const {beginYear, beginMonth} = await getBeginYearAndMonth(calcRequest);
+
+    // get the days in the month for this plan
+    const daysInMonths = utils.getDaysInMonth(beginYear, beginMonth);
+
+    const rateMap = laborCalc.calculateRate(position);
+
+    // calculate wages
+    let wages =null;
+    if(entity.labor_settings.wage_method === 'us') {
+      wages = laborCalc.calculateWagesUS(position,daysInMonths,position.ftes.values)
+    } else {
+      wages = laborCalc.calculateWagesEU(position, position.ftes.values);
+    }
+    if (!wages) throw new Error('Unable to calculate wages in [recalculateLaborPosition]');
+
+    // calculate bonus
+    const bonus = laborCalc.calculateBonus(position, wages.values);
+
+    // calculate social security
+    const socialsec = laborCalc.calculateSocialSec(position, wages.values);
+
+    // calculate avg FTEs
+    const ftes = laborCalc.calculateAvgFTEs(daysInMonths, position.ftes.values);
+
+    position.rate = rateMap;
+    position.wages = wages;
+    position.bonus = bonus;
+    position.socialsec = socialsec;
+    position.ftes =  ftes;
+    position.last_updated = admin.firestore.Timestamp.now();
+
+    await positionDocRef.update(position);
+
+
+  }
