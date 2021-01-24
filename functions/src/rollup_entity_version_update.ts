@@ -2,7 +2,7 @@ import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import * as entity_model from "./entity_model";
 import * as plan_model from "./plan_model";
-import * as utils from "./utils";
+import * as utils from "./utils/utils";
 
 const db = admin.firestore();
 

@@ -1,4 +1,4 @@
-import * as entity_model from "./entity_model";
+import * as entity_model from "../entity_model";
 import * as admin from "firebase-admin";
 
 const db = admin.firestore();

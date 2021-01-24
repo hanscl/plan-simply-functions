@@ -3,7 +3,7 @@ import { CalcRequest } from './version_calc_model';
 import { acctDriverDef, DriverEntry, driverAcct } from '../driver_model';
 import { accountDoc } from '../plan_model';
 
-import * as utils from '../utils';
+import * as utils from '../utils/utils';
 
 const db = admin.firestore();
 

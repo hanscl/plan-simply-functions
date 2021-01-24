@@ -3,4 +3,5 @@ export interface RollingForecastRequest {
     sourceVersionName: string;
     targetVersionName: string;
     seedMonth: number; // 1-12 for Jan-Dec
+    entityId?: string;
 }

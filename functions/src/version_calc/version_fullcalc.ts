@@ -3,7 +3,7 @@ import * as functions from 'firebase-functions';
 
 import * as entityModel from '../entity_model';
 import * as planModel from '../plan_model';
-import * as utils from '../utils';
+import * as utils from '../utils/utils';
 import * as viewModel from '../view_model';
 import * as driverModel from '../driver_model';
 

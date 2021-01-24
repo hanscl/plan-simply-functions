@@ -1,7 +1,7 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
-import * as https_utils from '../https_utils';
-import * as utils from '../utils';
+import * as https_utils from '../utils/https_utils';
+import * as utils from '../utils/utils';
 import * as config from '../config';
 import * as laborModel from './labor_model';
 import * as laborCalc from './labor_calc';

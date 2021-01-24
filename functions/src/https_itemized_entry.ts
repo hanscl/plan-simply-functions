@@ -1,6 +1,6 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
-import * as https_utils from './https_utils';
+import * as https_utils from './utils/https_utils';
 import * as version_recalc from './version_rollup_recalc_master';
 import * as config from './config';
 import { deleteDriverDefinition } from './driver_doc_change';

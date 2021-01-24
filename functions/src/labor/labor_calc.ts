@@ -1,5 +1,5 @@
 import * as laborModel from './labor_model';
-import * as utils from '../utils';
+import * as utils from '../utils/utils';
 
 export function calculateWagesEU(posData: laborModel.PositionData, ftes: number[]): laborModel.LaborCalc {
   try {

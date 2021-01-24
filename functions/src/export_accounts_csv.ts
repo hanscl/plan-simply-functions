@@ -4,7 +4,7 @@ import * as json2csv from "json2csv";
 import * as export_model from "./export_model";
 import * as entity_model from "./entity_model";
 import * as plan_model from "./plan_model";
-import * as utils from "./utils";
+import * as utils from "./utils/utils";
 
 const db = admin.firestore();
 

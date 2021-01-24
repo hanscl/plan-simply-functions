@@ -1,6 +1,6 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
-import * as https_utils from "./https_utils";
+import * as https_utils from "./utils/https_utils";
 import * as config from "./config";
 import * as cloudTasks from "./gcloud_task_dispatch";
 import * as compModel from "./version_comparison_model";

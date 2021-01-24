@@ -5,7 +5,7 @@ import { CalcRequest, AccountTotal } from './version_calc_model';
 import * as entityModel from '../entity_model';
 import * as planModel from '../plan_model';
 import * as laborModel from '../labor/labor_model';
-import * as utils from '../utils';
+import * as utils from '../utils/utils';
 
 interface AccountComponents {
   acctId: string;

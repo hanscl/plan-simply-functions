@@ -1,7 +1,7 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import * as gAuth from "google-auth-library";
-import * as config from "./config";
+import * as config from "../config";
 
 export function validateHeader(req: functions.https.Request) {
   if (req.headers.authorization && req.headers.authorization.startsWith("Bearer ")) {

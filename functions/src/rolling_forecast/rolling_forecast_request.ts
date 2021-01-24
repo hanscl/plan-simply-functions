@@ -1,6 +1,6 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
-import * as httpsUtils from '../https_utils';
+import * as httpsUtils from '../utils/https_utils';
 import * as config from '../config';;
 
 import { RollingForecastRequest } from './rolling_forecast_model';
@@ -53,7 +53,7 @@ export const requestRollForecast = functions
 
         await beginRollingForecast(rollingForecastRequest);
 
-        response.status(200).send({ result: `Template has been created.` });
+        response.status(200).send({ result: `Forecast has been rolled successfully.` });
       } catch (error) {
         console.log(`Error occured while rolling forecast month: ${error}`);
         response.status(500).send({ result: `Error occured while rolling forecast month. Please contact support` });

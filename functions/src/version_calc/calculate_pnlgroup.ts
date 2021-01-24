@@ -1,6 +1,6 @@
 import { CalcRequest, AccountCalculationType, mapTypeToLevel } from './version_calc_model';
 import * as admin from 'firebase-admin';
-import * as utils from '../utils';
+import * as utils from '../utils/utils';
 import * as planModel from '../plan_model';
 import * as viewModel from '../view_model';
 

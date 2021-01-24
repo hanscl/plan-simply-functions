@@ -1,6 +1,6 @@
 import * as admin from 'firebase-admin';
 import { versionDoc, planVersionCalendar } from '../plan_model';
-import { deleteCollection, initializeVersionLockObject } from '../utils';
+import { deleteCollection, initializeVersionLockObject } from '../utils/utils';
 import { completeRebuildAndRecalcVersion } from '../version_complete_rebuild';
 import { RollVersionRequest } from './roll_version_model';
 
@@ -13,22 +13,24 @@ export const beginRollVersion = async (rollVersionRequest: RollVersionRequest, r
       query = query.where(admin.firestore.FieldPath.documentId(), '==', rollVersionRequest.entityId);
     }
     const entityCollectionSnapshot = await query.get();
+    let targetPlanVersion = null;
 
     for (const entityDoc of entityCollectionSnapshot.docs) {
-      const { targetPlanId, targetVersionId } = await findEntityVersionSourceDocument(
+      targetPlanVersion = await findEntityVersionSourceDocument(
         entityDoc.ref,
         rollVersionRequest
       );
       if (recalcNewVersion) {
         await completeRebuildAndRecalcVersion({
           entityId: entityDoc.id,
-          planId: targetPlanId,
-          versionId: targetVersionId,
+          planId: targetPlanVersion.targetPlanId,
+          versionId: targetPlanVersion.targetVersionId,
         });
       }
     }
 
-    console.log('done');
+    return targetPlanVersion;
+
   } catch (error) {
     throw new Error(`Error occured in [beginRollVersion]: ${error}`);
   }

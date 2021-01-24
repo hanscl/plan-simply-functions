@@ -3,7 +3,7 @@ import * as admin from "firebase-admin";
 import * as compModel from "./version_comparison_model";
 import * as planModel from "./plan_model";
 import * as viewModel from "./view_model";
-import * as utils from "./utils";
+import * as utils from "./utils/utils";
 
 const db = admin.firestore();
 

@@ -1,6 +1,6 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
-import * as httpsUtils from '../https_utils';
+import * as httpsUtils from '../utils/https_utils';
 import * as config from '../config';
 import { RollVersionRequest } from './roll_version_model';
 import { beginRollVersion } from './roll_version';

@@ -2,7 +2,7 @@ import { CalcRequest, AccountCalculationType, mapTypeToLevel } from './version_c
 import { calculateDriverAccount } from './calculate_driver';
 import { calculateDivDeptRollup } from './calculate_divdept';
 import { calculatePnlOrGroupRollup } from './calculate_pnlgroup';
-import * as utils from '../utils';
+import * as utils from '../utils/utils';
 import * as entityModel from '../entity_model';
 import * as admin from 'firebase-admin';
 

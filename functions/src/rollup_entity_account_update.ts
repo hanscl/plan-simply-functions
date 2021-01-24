@@ -1,6 +1,6 @@
 import * as admin from "firebase-admin";
 import * as entity_model from "./entity_model";
-import * as utils from "./utils";
+import * as utils from "./utils/utils";
 import * as version_recalc from "./version_rollup_recalc_master";
 
 interface recalcParams {

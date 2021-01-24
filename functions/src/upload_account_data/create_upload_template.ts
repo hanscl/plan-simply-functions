@@ -4,7 +4,7 @@ import * as json2csv from 'json2csv';
 import { UploadTemplateRequest, UploadTemplateCsv } from './upload_model';
 import { entityDoc } from '../entity_model';
 import { accountDoc } from '../plan_model';
-import * as utils from '../utils';
+import * as utils from '../utils/utils';
 
 const db = admin.firestore();
 

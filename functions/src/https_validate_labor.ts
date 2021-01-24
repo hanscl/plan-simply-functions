@@ -1,6 +1,6 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
-import * as https_utils from "./https_utils";
+import * as https_utils from "./utils/https_utils";
 import * as config from "./config";
 import { accountDoc } from "./plan_model";
 const cors = require("cors")({ origin: true });

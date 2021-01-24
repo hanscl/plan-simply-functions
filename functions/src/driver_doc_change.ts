@@ -3,7 +3,7 @@ import * as admin from 'firebase-admin';
 import * as driver_model from './driver_model';
 import * as driver_dependencies from './driver_dependencies';
 import * as driver_calc from './driver_calc';
-import * as utils from './utils';
+import * as utils from './utils/utils';
 import { QueryDocumentSnapshot } from 'firebase-functions/lib/providers/firestore';
 
 const db = admin.firestore();

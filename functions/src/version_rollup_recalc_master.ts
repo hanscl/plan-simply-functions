@@ -1,12 +1,12 @@
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
 import * as plan_model from "./plan_model";
-import * as utils from "./utils";
+import * as utils from "./utils/utils";
 import * as version_recalc_slave from "./version_rollup_recalc_slave";
 import * as rollup_entity_account_update from "./rollup_entity_account_update";
 import * as driver_calc from "./driver_calc";
 import * as config from "./config";
-import * as https_utils from "./https_utils";
+import * as https_utils from "./utils/https_utils";
 
 const db = admin.firestore();
 
