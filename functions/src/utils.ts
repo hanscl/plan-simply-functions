@@ -267,3 +267,13 @@ export function arraySubtract(minuend: number[], subtrahend: number[]): number[]
 
   return difference;
 }
+
+export const initializeVersionLockObject = (lockStatus: boolean) => {
+  const lockObj = {all: lockStatus, periods: [] as boolean[]}
+  
+  for(let i = 0; i< 12; i++) {
+    lockObj.periods.push(lockStatus);
+  }
+
+  return lockObj;
+}

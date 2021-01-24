@@ -31,7 +31,7 @@ interface AccountWithDependencies {
   dependentAccounts: string[];
 }
 
-const versionFullCalc = async (calcRequest: CalcRequest) => {
+export const versionFullCalc = async (calcRequest: CalcRequest) => {
   try {
     const versionDocumentReference = db.doc(
       `entities/${calcRequest.entityId}/plans/${calcRequest.planId}/versions/${calcRequest.versionId}`

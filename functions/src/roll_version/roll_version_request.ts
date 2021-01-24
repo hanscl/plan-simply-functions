@@ -9,7 +9,7 @@ const cors = require('cors')({ origin: true });
 
 const db = admin.firestore();
 
-export const requestRollVersion = functions.region(config.cloudFuncLoc).https.onRequest(async (request, response) => {
+export const requestRollVersion = functions.runWith({ timeoutSeconds: 540 }).region(config.cloudFuncLoc).https.onRequest(async (request, response) => {
   cors(request, response, async () => {
     try {
       response.set('Access-Control-Allow-Origin', '*');
@@ -48,9 +48,9 @@ export const requestRollVersion = functions.region(config.cloudFuncLoc).https.on
 
       const rollVersionRequest = request.body as RollVersionRequest;
 
-      await beginRollVersion(rollVersionRequest);
+      await beginRollVersion(rollVersionRequest, true);
 
-      response.status(200).send({ result: `Template has been created.` });
+      response.status(200).send({ result: `Version has been rolled successfully.` });
     } catch (error) {
       console.log(`Error occured while rolling a version: ${error}`);
       response.status(500).send({ result: `Error occured while rolling a version. Please contact support` });

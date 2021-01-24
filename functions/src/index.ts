@@ -55,3 +55,6 @@ export { testRollupHierarchyRequest } from './version_calc/version_fullcalc';
 export { testHierarchyRebuild } from './version_calc/version_hierarchy_rebuild';
 
 export { requestUploadTemplate } from './upload_account_data/user_template_request';
+export {requestUploadDataToVersion} from './upload_account_data/user_upload_request';
+export {requestRollVersion} from './roll_version/roll_version_request';
+export {requestRollForecast} from './rolling_forecast/rolling_forecast_request';

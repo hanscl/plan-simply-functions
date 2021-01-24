@@ -4,6 +4,7 @@ export interface RollVersionRequest {
   copyDrivers: boolean;
   copyLaborPositions: boolean;
   lockSourceVersion: boolean;
+  entityId?: string;
 }
 
 interface PlanVersion {

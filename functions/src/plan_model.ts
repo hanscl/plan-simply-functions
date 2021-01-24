@@ -21,6 +21,18 @@ export interface versionDoc {
   child_version_ids: string[];
   is_locked: versionLockStatus;
   labor_version?: number;
+  // add calendar as optional
+  begin_month?: number;
+  begin_year?: number;
+  periods?: viewPeriod[];
+  total?: viewTotal;
+}
+
+export interface planVersionCalendar {
+  begin_month?: number,
+  begin_year?: number,
+  periods?: viewPeriod[];
+  total?: viewTotal;
 }
 
 export interface versionLockStatus {

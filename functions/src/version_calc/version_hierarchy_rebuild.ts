@@ -12,7 +12,7 @@ import { getEntityDetails } from './version_calc_helpers';
 import { CalcRequest } from './version_calc_model';
 const db = admin.firestore();
 
-const rebuildVersionHierarchy = async (calcRequest: CalcRequest) => {
+export const rebuildVersionHierarchy = async (calcRequest: CalcRequest) => {
   try {
     const versionDocumentReference = db.doc(
       `entities/${calcRequest.entityId}/plans/${calcRequest.planId}/versions/${calcRequest.versionId}`
