@@ -7,6 +7,11 @@ export interface RollVersionRequest {
   entityId?: string;
 }
 
+export interface RollVersionForEntity extends RollVersionRequest {
+  entityId: string;
+}
+
+
 export interface PlanVersion {
   planName: string;
   versionName: string;

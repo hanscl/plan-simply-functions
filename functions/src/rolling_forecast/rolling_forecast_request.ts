@@ -1,10 +1,11 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import * as httpsUtils from '../utils/https_utils';
-import * as config from '../config';;
+import * as config from '../config';
 
-import { RollingForecastRequest } from './rolling_forecast_model';
-import { beginRollingForecast } from './rolling_forecast'
+import { RollingForecastForEntity, RollingForecastRequest } from './rolling_forecast_model';
+import { beginRollingForecast } from './rolling_forecast';
+import { dispatchGCloudTask } from '../gcloud_task_dispatch';
 
 const cors = require('cors')({ origin: true });
 
@@ -12,6 +13,7 @@ const db = admin.firestore();
 
 export const requestRollForecast = functions
   .region(config.cloudFuncLoc)
+  .runWith({ timeoutSeconds: 540 })
   .https.onRequest(async (request, response) => {
     cors(request, response, async () => {
       try {
@@ -51,12 +53,48 @@ export const requestRollForecast = functions
 
         const rollingForecastRequest = request.body as RollingForecastRequest;
 
-        await beginRollingForecast(rollingForecastRequest);
+        if (rollingForecastRequest.entityId) {
+          await beginRollingForecast(rollingForecastRequest as RollingForecastForEntity);
+          response.status(200).send({ result: `Forecast has been rolled successfully.` });
+        } else {
+          console.log('Rolling Forecast requested for all entities. Begin async dispatch');
+          const query = db.collection(`entities`).where('type', '==', 'entity');
+          const entityCollectionSnapshot = await query.get();
 
-        response.status(200).send({ result: `Forecast has been rolled successfully.` });
+          for (const entityDoc of entityCollectionSnapshot.docs) {
+            console.log(`Dispatching GCT for [rollingForecastGCT] and entity ${entityDoc.id}`);
+            await dispatchGCloudTask(
+              { ...rollingForecastRequest, entityId: entityDoc.id },
+              'rolling-forecast-async',
+              'recalc'
+            );
+          }
+          response.status(200).send({ result: `Tasks for rolling forecasts have been scheduled.` });
+        }
       } catch (error) {
         console.log(`Error occured while rolling forecast month: ${error}`);
         response.status(500).send({ result: `Error occured while rolling forecast month. Please contact support` });
       }
     });
   });
+
+//rolling-forecast-async
+export const rollingForecastGCT = functions.region(config.cloudFuncLoc).https.onRequest(async (request, response) => {
+  try {
+    console.log('running [rollingForecastGCT]');
+    // Verify the request
+    await httpsUtils.verifyCloudTaskRequest(request, 'rolling-forecast-async');
+
+    // get the request body
+    const rollFcstReq = request.body as RollingForecastForEntity;
+
+    console.log(`Running rollingForecastGCT with parameters: ${JSON.stringify(rollFcstReq)}`);
+
+    await beginRollingForecast(rollFcstReq);
+
+    response.status(200).send({ result: `rolling forecast completed.` });
+  } catch (error) {
+    console.log(`Error occured while requesting rollingForecastGCT: ${error}. This should be retried.`);
+    response.status(500).send({ result: `Could not execute rollingForecastGCT. Please contact support` });
+  }
+});

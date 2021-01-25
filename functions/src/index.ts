@@ -6,7 +6,7 @@ export { writeUserAccount } from './custom_claims';
 
 // NEW VERSIONS
 export { planVersionGroupCreate } from './plan_version_group_calc';
-export { planViewGenerate } from './plan_view_generate';
+export { planViewGenerateTrigger } from './plan_view_generate';
 export { entityHierarchyUpdate } from './entity_update_hier';
 export { versionDocCreate } from './version_create';
 export { createVersionFromExisting } from './https_duplicate_version';
@@ -50,11 +50,12 @@ export { processVersionComparison } from './version_comparison_init';
 export { versionRollupRecalcGCT } from './version_rollup_recalc_master';
 
 // Fullcalc
-export { testRollupRecalcOnCall, testRollupRecalcRequest } from './version_calc/version_fullcalc';
+export { testRollupRecalcOnCall, testRollupRecalcRequest, versionFullCalcGCT } from './version_calc/version_fullcalc';
 export { testHierarchyRebuild } from './version_calc/version_hierarchy_rebuild';
 
 export { requestUploadTemplate } from './upload_account_data/user_template_request';
 export { validateDataToUploadIntoVersion } from './upload_account_data/user_validate_request';
 export { requestUploadDataToVersion } from './upload_account_data/user_upload_request';
-export { requestRollVersion } from './roll_version/roll_version_request';
-export { requestRollForecast } from './rolling_forecast/rolling_forecast_request';
+export { requestRollVersion,rollVersionGCT } from './roll_version/roll_version_request';
+export { requestRollForecast, rollingForecastGCT } from './rolling_forecast/rolling_forecast_request';
+

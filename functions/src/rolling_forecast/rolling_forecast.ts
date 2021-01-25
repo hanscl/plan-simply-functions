@@ -1,51 +1,48 @@
 import * as admin from 'firebase-admin';
 
-import { RollingForecastRequest } from './rolling_forecast_model';
+import { RollingForecastForEntity } from './rolling_forecast_model';
 import { beginRollVersion } from '../roll_version/roll_version';
-import { RollVersionRequest } from '../roll_version/roll_version_model';
+import { RollVersionForEntity } from '../roll_version/roll_version_model';
 // import { completeRebuildAndRecalcVersion } from '../version_complete_rebuild';
 import { accountDoc, versionDoc } from '../plan_model';
 import { initVersionCalendar } from '../utils/version_calendar';
 import { PositionDoc } from '../labor/labor_model';
 import { acctDriverDef } from '../driver_model';
-import { completeRebuildAndRecalcVersion } from '../version_complete_rebuild'
+import { completeRebuildAndRecalcVersion } from '../version_complete_rebuild';
 
 const db = admin.firestore();
 
-export const beginRollingForecast = async (rollingForecastRequest: RollingForecastRequest) => {
+export const beginRollingForecast = async (rollingForecastRequest: RollingForecastForEntity) => {
   try {
-    let query = db.collection(`entities`).where('type', '==', 'entity');
-    if (rollingForecastRequest.entityId) {
-      query = query.where(admin.firestore.FieldPath.documentId(), '==', rollingForecastRequest.entityId);
+    const entityDoc = await db.doc(`entities/${rollingForecastRequest.entityId}`).get();
+    if (!entityDoc.exists) {
+      throw new Error(`Could not find entity ${rollingForecastRequest.entityId} at [beginRollingForecast]. Aborting`);
     }
-    const entityCollectionSnapshot = await query.get();
 
-    for (const entityDoc of entityCollectionSnapshot.docs) {
-      const targetPlanVersion = await copyVersionWithoutChanges(entityDoc.id, rollingForecastRequest);
-      if (!targetPlanVersion) {
-        throw new Error(`Error occured in [beginRollingForecast]: rolling Version did not succeed`);
-      }
-
-      const newVersionRef = entityDoc.ref
-        .collection('plans')
-        .doc(targetPlanVersion.targetPlanId)
-        .collection('versions')
-        .doc(targetPlanVersion.targetVersionId);
-
-      // do all the rolling stuff
-      await updateVersionCalendar(newVersionRef);
-
-      const { seedMonth } = rollingForecastRequest;
-      await updateAccountEntries(newVersionRef, seedMonth);
-      await updateLaborPositions(entityDoc.id, targetPlanVersion.targetVersionId, seedMonth);
-      await updateDrivers(entityDoc.id, targetPlanVersion.targetVersionId, seedMonth);
-      
-      await completeRebuildAndRecalcVersion({
-        entityId: entityDoc.id,
-        planId: targetPlanVersion.targetPlanId,
-        versionId: targetPlanVersion.targetVersionId,
-      });
+    const targetPlanVersion = await copyVersionWithoutChanges(entityDoc.id, rollingForecastRequest);
+    if (!targetPlanVersion) {
+      throw new Error(`Error occured in [beginRollingForecast]: rolling Version did not succeed`);
     }
+
+    const newVersionRef = entityDoc.ref
+      .collection('plans')
+      .doc(targetPlanVersion.targetPlanId)
+      .collection('versions')
+      .doc(targetPlanVersion.targetVersionId);
+
+    // do all the rolling stuff
+    await updateVersionCalendar(newVersionRef);
+
+    const { seedMonth } = rollingForecastRequest;
+    await updateAccountEntries(newVersionRef, seedMonth);
+    await updateLaborPositions(entityDoc.id, targetPlanVersion.targetVersionId, seedMonth);
+    await updateDrivers(entityDoc.id, targetPlanVersion.targetVersionId, seedMonth);
+
+    await completeRebuildAndRecalcVersion({
+      entityId: entityDoc.id,
+      planId: targetPlanVersion.targetPlanId,
+      versionId: targetPlanVersion.targetVersionId,
+    });
   } catch (error) {
     throw new Error(`Error occured in [beginRollingForecast]: ${error}`);
   }
@@ -117,13 +114,13 @@ const updateVersionCalendar = async (versionRef: FirebaseFirestore.DocumentRefer
   if (!versionSnap.exists) {
     throw new Error(`Unable to load version document in [updateVersionCalendar]`);
   }
-  const versionDoc = versionSnap.data() as versionDoc;
-  if (!versionDoc.begin_month || !versionDoc.begin_year) {
+  const versionDocData = versionSnap.data() as versionDoc;
+  if (!versionDocData.begin_month || !versionDocData.begin_year) {
     throw new Error(`Missing calendar in version document [updateVersionCalendar]`);
   }
 
-  let newBeginMonth = ++versionDoc.begin_month;
-  let newBeginYear = versionDoc.begin_year;
+  let newBeginMonth = ++versionDocData.begin_month;
+  let newBeginYear = versionDocData.begin_year;
 
   if (newBeginMonth > 12) {
     newBeginMonth = 1;
@@ -135,8 +132,8 @@ const updateVersionCalendar = async (versionRef: FirebaseFirestore.DocumentRefer
   await versionRef.update({ begin_month: newBeginMonth, begin_year: newBeginYear, periods: updatedVersionCalendar });
 };
 
-const copyVersionWithoutChanges = async (entityId: string, rollingForecastRequest: RollingForecastRequest) => {
-  const rollVersionRequest: RollVersionRequest = {
+const copyVersionWithoutChanges = async (entityId: string, rollingForecastRequest: RollingForecastForEntity) => {
+  const rollVersionRequest: RollVersionForEntity = {
     copyDrivers: true,
     copyLaborPositions: true,
     lockSourceVersion: true,

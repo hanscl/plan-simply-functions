@@ -98,7 +98,7 @@ const updateLaborAccountsInFirestore = async (calcRequest: CalcRequest, laborAcc
   
       if (batchCounter > 0) {
         // TODO: COMMENT IN FIRESTORE BATCH COMMIT
-        firestoreBatch.commit();
+        await firestoreBatch.commit();
       }
     } catch (error) {
       console.log(`Error occured in [updateLaborAccountsInFirestore]: ${error}`);

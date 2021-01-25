@@ -9,7 +9,7 @@ import * as viewModel from '../view_model';
 import * as driverModel from '../driver_model';
 import { verifyCloudTaskRequest } from '../utils/https_utils';
 
-import { calculateAccount } from './calculate_account';
+import { calculateAccount, recalcAnnualTotalsForItemizedEntry } from './calculate_account';
 import { sumUpLaborTotalsFromPositions } from './calculate_labor';
 import { getEntityDetails, getVersionDetails} from './version_calc_helpers';
 
@@ -44,6 +44,9 @@ export const versionFullCalc = async (calcRequest: CalcRequest) => {
     // get additional information from the database for the recalc process
     const entity = await getEntityDetails(db, calcRequest.entityId);
     const version = await getVersionDetails(db, calcRequest);
+
+    // recalculate the annual totals for all "entry level accounts" first
+    await recalcAnnualTotalsForItemizedEntry(versionDocumentReference);
 
     // Calculate LABOR only for regular entities (not rollups)
     if (entity.type === 'entity') {
@@ -390,6 +393,7 @@ export const testRollupRecalcRequest = functions
 
   export const versionFullCalcGCT = functions.region(config.cloudFuncLoc).https.onRequest(async (request, response) => {
     try {
+      console.log('running [versionFullCalcGCT]');
       // Verify the request
       await verifyCloudTaskRequest(request, "version-fullcalc-async");
   

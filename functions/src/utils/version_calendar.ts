@@ -43,7 +43,7 @@ export const initVersionCalendar = (beginMonth: number, beginYear: number) => {
   }
 
   for (const headerDefinition of newMonthsOrder) {
-    if (midYearStart && headerDefinition.number == 1) {
+    if (midYearStart && headerDefinition.number === 1) {
       currentYear++;
     }
     headerDefinition.year = currentYear;
@@ -76,19 +76,19 @@ export const getBeginYearAndMonth = async (entityPlanVersion: {
     throw new Error(`Version document not found in [recalculateLaborPosition]`);
   }
 
-  const versionDoc = versionSnap.data() as versionDoc;
+  const versionDocData = versionSnap.data() as versionDoc;
 
-  if (versionDoc.begin_year && versionDoc.begin_month) {
-    beginMonth = versionDoc.begin_month;
-    beginYear = versionDoc.begin_year;
+  if (versionDocData.begin_year && versionDocData.begin_month) {
+    beginMonth = versionDocData.begin_month;
+    beginYear = versionDocData.begin_year;
   } else {
     const planSnap = await planRef.get();
     if (!planSnap.exists) {
       throw new Error(`Plan document not found in [recalculateLaborPosition]`);
     }
-    const planDoc = planSnap.data() as planDoc;
-    beginMonth = planDoc.begin_month;
-    beginYear = planDoc.begin_year;
+    const planDocData = planSnap.data() as planDoc;
+    beginMonth = planDocData.begin_month;
+    beginYear = planDocData.begin_year;
   }
 
   return { beginMonth: beginMonth, beginYear: beginYear };
