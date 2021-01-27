@@ -205,6 +205,13 @@ export const updateRollupEntityVersion = functions
           is_locked: { all: true, periods: [true, true, true, true, true, true, true, true, true, true, true, true] },
         };
 
+        if(child_entity_version.begin_year && child_entity_version.begin_month && child_entity_version.periods && child_entity_version.total) {
+          version_doc.begin_year = child_entity_version.begin_year;
+          version_doc.begin_month = child_entity_version.begin_month;
+          version_doc.periods = child_entity_version.periods;
+          version_doc.total =  child_entity_version.total;
+        }
+
         // DB: version doc to batch
         if (rollup_version_ref === undefined) rollup_version_ref = rollup_plan_ref.collection('versions').doc();
         acct_wx_batch.set(rollup_version_ref, version_doc);

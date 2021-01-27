@@ -2,7 +2,6 @@ import * as admin from 'firebase-admin';
 import { accountDoc } from '../plan_model';
 
 import { UploadAccountDataRequest } from './upload_model';
-import { validateDataToUploadIntoVersion } from './user_validate_request'
 
 const db = admin.firestore();
 
