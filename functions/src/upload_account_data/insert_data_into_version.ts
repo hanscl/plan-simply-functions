@@ -56,10 +56,14 @@ const processAccountRow = async (
   laborPosRef: FirebaseFirestore.DocumentReference,
   driverRef: FirebaseFirestore.DocumentReference
 ) => {
+  console.log(`Processing Account Row for Upload: ${JSON.stringify(accountDataRow)} for Version ${versionRef.id}, Labor ${laborPosRef.id}, Driver ${driverRef.id} with existing nLevelAccounts: ${JSON.stringify(existingNLevelAccts)}`);
   const acctRef = versionRef.collection('dept').doc(accountDataRow.full_account);
+  console.log(`found acct ref: ${JSON.stringify(acctRef)}`);
   const existAcctFiltered = existingNLevelAccts.filter((acct) => acct.fullAccount === accountDataRow.full_account);
   if (existAcctFiltered.length === 1) {
+    console.log(`Labor or driver will be overwritten`);
     if (existAcctFiltered[0].calcType === 'driver') {
+      console.log(`deleting driver account: ${JSON.stringify(driverRef.id)} - ${accountDataRow.full_account}`);
       firestoreTx.delete(driverRef.collection('dept').doc(accountDataRow.full_account));
     } else if (existAcctFiltered[0].calcType === 'labor') {
       const allPositionsForAccoutSnap = await laborPosRef
@@ -68,10 +72,13 @@ const processAccountRow = async (
         .where('dept', '==', accountDataRow.cost_center)
         .get();
       for (const positionDoc of allPositionsForAccoutSnap.docs) {
+        console.log(`deleting position account: ${JSON.stringify(positionDoc.ref)}`);
         firestoreTx.delete(positionDoc.ref);
       }
     }
+    console.log(`changing calc type for ${acctRef.id} to "entry"`);
     firestoreTx.update(acctRef, 'calc_type', 'entry');
   }
+  console.log(`Uploading values: ${acctRef.id} = ${JSON.stringify(accountDataRow.values)}`);
   firestoreTx.update(acctRef, 'values', accountDataRow.values);
 };

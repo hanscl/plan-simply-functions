@@ -2,6 +2,7 @@ import * as admin from 'firebase-admin';
 import { accountDoc } from '../plan_model';
 
 import { UploadAccountDataRequest } from './upload_model';
+import { validateDataToUploadIntoVersion } from './user_validate_request'
 
 const db = admin.firestore();
 
@@ -23,12 +24,14 @@ export const validateUploadedData = async (uploadDataRequest: UploadAccountDataR
         driverLaborAccounts.push(account.full_account);
       }
     }
+    console.log(`Accounts found for check. [1] Itemized Entry: ${validAccounts}, [2] Driver or Labor: ${driverLaborAccounts}`);
 
     // make sure all accounts are valid
     const invalidAccounts = uploadDataRequest.data.filter(
-      (accountRow) => !validAccounts.includes(accountRow.full_account)
+      (accountRow) => !(validAccounts.includes(accountRow.full_account) || driverLaborAccounts.includes(accountRow.full_account))
     );
-
+    
+    console.log(`Array of invalid accounts: ${JSON.stringify(invalidAccounts)}`);
 
     if (invalidAccounts.length > 0) {
       return {
@@ -38,11 +41,13 @@ export const validateUploadedData = async (uploadDataRequest: UploadAccountDataR
         )}`,
       };
     }
-
+    
     // confirm that all values are numbers
     const nanAccountRows = uploadDataRequest.data.filter(
       (accountRow) => !accountRow.values.every((val) => !isNaN(val))
     );
+
+    console.log(`Array of rows with at least one NaN: ${JSON.stringify(nanAccountRows)}`);
 
     if (nanAccountRows.length > 0) {
       return {
@@ -57,6 +62,9 @@ export const validateUploadedData = async (uploadDataRequest: UploadAccountDataR
     const uploadAccountsIntoDriverLabor = uploadDataRequest.data.filter((row) =>
       driverLaborAccounts.includes(row.full_account)
     );
+
+    console.log(`Driver or Labor accounts to be overwritten with vallues: ${JSON.stringify(uploadAccountsIntoDriverLabor)}`);
+
     if (uploadAccountsIntoDriverLabor.length > 0) {
       return {
         status: 'WARNING',

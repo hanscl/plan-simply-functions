@@ -11,7 +11,7 @@ const cors = require('cors')({ origin: true });
 const db = admin.firestore();
 
 export const requestRollVersion = functions
-  .runWith({ timeoutSeconds: 540 })
+  .runWith({ timeoutSeconds: 540, memory: '1GB' })
   .region(config.cloudFuncLoc)
   .https.onRequest(async (request, response) => {
     cors(request, response, async () => {
@@ -52,20 +52,43 @@ export const requestRollVersion = functions
 
         const rollVersionRequest = request.body as RollVersionRequest;
 
-        if (rollVersionRequest.entityId) {
-          await beginRollVersion(rollVersionRequest as RollVersionForEntity, true);
-          response.status(200).send({ result: `Version has been rolled successfully.` });
-        } else {
-          console.log('Version roll requested for all entities. Begin async dispatch');
-          const query = db.collection(`entities`).where('type', '==', 'entity');
-          const entityCollectionSnapshot = await query.get();
+        let query = db.collection(`entities`).where('type', '==', 'entity');
 
-          for (const entityDoc of entityCollectionSnapshot.docs) {
-            console.log(`Dispatching GCT for [rollVersionGCT] and entity ${entityDoc.id}`);
-            await dispatchGCloudTask({ ...rollVersionRequest, entityId: entityDoc.id }, 'roll-version-async', 'recalc');
-          }
-          response.status(200).send({ result: `Tasks for version rolls have been scheduled.` });
+        if (rollVersionRequest.entityIds && rollVersionRequest.entityIds.length > 0) {
+          query = query.where(admin.firestore.FieldPath.documentId(), 'in', rollVersionRequest.entityIds);
         }
+        const entityCollectionSnapshot = await query.get();
+
+        let inSeconds = 0;
+        for (const entityDoc of entityCollectionSnapshot.docs) {
+          console.log(`Dispatching GCT for [rollVersionGCT] and entity ${entityDoc.id}`);
+
+          const {
+            sourcePlanVersion,
+            targetPlanVersion,
+            copyDrivers,
+            copyLaborPositions,
+            lockSourceVersion,
+          } = rollVersionRequest;
+
+          const gctRollPanReq: RollVersionForEntity = {
+            sourcePlanVersion: sourcePlanVersion,
+            targetPlanVersion: targetPlanVersion,
+            copyDrivers: copyDrivers,
+            copyLaborPositions: copyLaborPositions,
+            lockSourceVersion: lockSourceVersion,
+            entityId: entityDoc.id,
+          };
+
+          await dispatchGCloudTask(
+            gctRollPanReq,
+            'roll-version-async',
+            'general',
+            inSeconds
+          );
+          inSeconds += 30;
+        }
+        response.status(200).send({ result: `Tasks for version rolls have been scheduled.` });
       } catch (error) {
         console.log(`Error occured while rolling a version: ${error}`);
         response.status(500).send({ result: `Error occured while rolling a version. Please contact support` });
@@ -74,23 +97,25 @@ export const requestRollVersion = functions
   });
 
 // roll-version-async
-export const rollVersionGCT = functions.region(config.cloudFuncLoc).https.onRequest(async (request, response) => {
-  try {
-    console.log('running [rollVersionGCT]');
-    // Verify the request
-    await httpsUtils.verifyCloudTaskRequest(request, 'roll-version-async');
+export const rollVersionGCT = functions
+  .runWith({ timeoutSeconds: 540, memory: '1GB' })
+  .region(config.taskQueueLoc)
+  .https.onRequest(async (request, response) => {
+    try {
+      console.log('running [rollVersionGCT]');
+      // Verify the request
+      await httpsUtils.verifyCloudTaskRequest(request, 'roll-version-async');
 
-    // get the request body
+      // get the request body
+      const rollVersionReq = request.body as RollVersionForEntity;
 
-    const rollVersionReq = request.body as RollVersionForEntity;
+      console.log(`Running rollVersionGCT with parameters: ${JSON.stringify(rollVersionReq)}`);
 
-    console.log(`Running rollVersionGCT with parameters: ${JSON.stringify(rollVersionReq)}`);
+      await beginRollVersion(rollVersionReq, true);
 
-    await beginRollVersion(rollVersionReq, true);
-
-    response.status(200).send({ result: `version roll completed` });
-  } catch (error) {
-    console.log(`Error occured while requesting rollVersionGCT: ${error}. This should be retried.`);
-    response.status(500).send({ result: `Could not execute rollVersionGCT. Please contact support` });
-  }
-});
+      response.status(200).send({ result: `version roll completed` });
+    } catch (error) {
+      console.log(`Error occured while requesting rollVersionGCT: ${error}. This should be retried.`);
+      response.status(500).send({ result: `Could not execute rollVersionGCT. Please contact support` });
+    }
+  });

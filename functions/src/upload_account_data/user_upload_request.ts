@@ -3,7 +3,7 @@ import * as admin from 'firebase-admin';
 import * as httpsUtils from '../utils/https_utils';
 import * as config from '../config';
 
-import { UploadAccountDataRequest } from './upload_model';
+import { UploadAccountDataRequest, UploadTemplateRequest } from './upload_model';
 import { insertDataIntoVersion } from './insert_data_into_version';
 import { dispatchGCloudTask } from '../gcloud_task_dispatch';
 
@@ -57,18 +57,15 @@ export const requestUploadDataToVersion = functions
 
         const { entityId, planId, versionId } = uploadDataRequest;
 
+        const uploadReqGCT: UploadTemplateRequest = { entityId: entityId, planId: planId, versionId: versionId };
+
         // schedule the cloud task
-        await dispatchGCloudTask(
-          { entityId: entityId, planId: planId, versionId: versionId },
-          'version-fullcalc-async',
-          'recalc'
-        );
-        response
-          .status(200)
-          .send({
-            status: 'OK',
-            message: 'Data uploaded successfully. Version calculation will be completed within 1-2 minutes',
-          });
+        await dispatchGCloudTask(uploadReqGCT, 'version-fullcalc-async', 'general');
+        
+        response.status(200).send({
+          status: 'OK',
+          message: 'Data uploaded successfully. Version calculation will be completed within 1-2 minutes',
+        });
       } catch (error) {
         console.log(`Error occured while processing data upload: ${error}`);
         response.status(500).send({ status: 'ERROR', message: `Unable to upload data: ${error}` });

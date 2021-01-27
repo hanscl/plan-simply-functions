@@ -28,10 +28,14 @@ export const sumUpLaborTotalsFromPositions = async (
       .collection(`entities/${calcRequest.entityId}/labor/${calcRequest.versionId}/positions`)
       .get();
     const laborAccountTotals: AccountTotal[] = [];
-    console.log(`entities/${calcRequest.entityId}/labor/${calcRequest.versionId}/positions`);
     console.log(JSON.stringify(positionCollectionSnapshot));
     for (const positionDocument of positionCollectionSnapshot.docs) {
       const position = positionDocument.data() as laborModel.PositionDoc;
+
+      // skip over positions that are not assigned an account and a dept
+      if(!position.acct || !position.dept) {
+        continue;
+      }
       // refresh the position
       await recalculateLaborPosition(positionDocument.ref, position, calcRequest, entity);
 

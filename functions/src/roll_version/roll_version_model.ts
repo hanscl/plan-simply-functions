@@ -1,16 +1,18 @@
-export interface RollVersionRequest {
+interface RollVersionBase {
   sourcePlanVersion: PlanVersion;
   targetPlanVersion: PlanVersion;
   copyDrivers: boolean;
   copyLaborPositions: boolean;
   lockSourceVersion: boolean;
-  entityId?: string;
 }
 
-export interface RollVersionForEntity extends RollVersionRequest {
+export interface RollVersionRequest extends RollVersionBase {
+  entityIds?: string;
+}
+
+export interface RollVersionForEntity extends RollVersionBase {
   entityId: string;
 }
-
 
 export interface PlanVersion {
   planName: string;

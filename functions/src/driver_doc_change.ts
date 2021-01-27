@@ -5,6 +5,7 @@ import * as driver_dependencies from './driver_dependencies';
 import * as driver_calc from './driver_calc';
 import * as utils from './utils/utils';
 import { QueryDocumentSnapshot } from 'firebase-functions/lib/providers/firestore';
+import {versionDoc} from './plan_model';
 
 const db = admin.firestore();
 
@@ -23,6 +24,23 @@ export const driverDocUpdate = functions.firestore
 
       if (await driverDocNullCheck(snapshot.after)) {
         console.log(`drivers were updated. exit function -- this will be called again`);
+        return;
+      }
+
+      // check the version
+      const driverDoc = await db.doc(`entities/${context.params.entityId}/drivers/${context.params.versionId}`).get();
+      if(!driverDoc.exists) {
+        throw new Error(`unable to find driver doc at driverDocUpdate`);
+      }
+      const planID = (driverDoc.data() as {plan_id: string, version_id: string;}).plan_id;
+      
+      const versionDocSnap = await db.doc(`entities/${context.params.entityId}/plans/${planID}/versions/${context.params.versionId}`).get();
+      if(!versionDocSnap.exists) {
+        throw new Error(`unable to find version doc at driverDocUpdate`);
+      }
+      const version = versionDocSnap.data() as versionDoc;
+      if(!version.calculated) {
+        console.log(`Version not ready for realtime processing`);
         return;
       }
 

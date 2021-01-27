@@ -11,7 +11,7 @@ import { verifyCloudTaskRequest } from '../utils/https_utils';
 
 import { calculateAccount, recalcAnnualTotalsForItemizedEntry } from './calculate_account';
 import { sumUpLaborTotalsFromPositions } from './calculate_labor';
-import { getEntityDetails, getVersionDetails} from './version_calc_helpers';
+import { getEntityDetails, getVersionDetails } from './version_calc_helpers';
 
 import {
   CalcRequest,
@@ -89,12 +89,15 @@ const saveDependenciesToFirestore = async (uncalculatedAccounts: PendingAccountB
         precedents: acctWithDependencies.dependentAccounts,
       });
       dbOpsCounter++;
+      if (dbOpsCounter > 400) {
+        await firestoreBatch.commit();
+        firestoreBatch = db.batch();
+        dbOpsCounter = 0;
+      }
     }
-    if (dbOpsCounter > 0) {
-      await firestoreBatch.commit();
-      firestoreBatch = db.batch();
-      dbOpsCounter = 0;
-    }
+  }
+  if (dbOpsCounter > 0) {
+    await firestoreBatch.commit();
   }
 };
 
@@ -390,17 +393,19 @@ export const testRollupRecalcRequest = functions
     });
   });
 
-
-  export const versionFullCalcGCT = functions.region(config.cloudFuncLoc).https.onRequest(async (request, response) => {
+export const versionFullCalcGCT = functions
+  .runWith({ timeoutSeconds: 540, memory: '1GB' })
+  .region(config.taskQueueLoc)
+  .https.onRequest(async (request, response) => {
     try {
       console.log('running [versionFullCalcGCT]');
       // Verify the request
-      await verifyCloudTaskRequest(request, "version-fullcalc-async");
-  
+      await verifyCloudTaskRequest(request, 'version-fullcalc-async');
+
       // get the request body
-  
+
       const calcReq = request.body as CalcRequest;
-  
+
       console.log(`Running versionFullCalcGCT with parameters: ${JSON.stringify(calcReq)}`);
 
       await versionFullCalc(calcReq);
@@ -411,4 +416,3 @@ export const testRollupRecalcRequest = functions
       response.status(500).send({ result: `Could not execute versionFullCalcGCT. Please contact support` });
     }
   });
-  

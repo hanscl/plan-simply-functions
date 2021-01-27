@@ -10,6 +10,10 @@ export const beginRollVersion = async (rollVersionRequest: RollVersionForEntity,
   try {
     await updateCompanyPlanVersionMaster(rollVersionRequest.targetPlanVersion);
 
+    if(rollVersionRequest.copyDrivers === undefined || rollVersionRequest.copyLaborPositions === undefined ) {
+      throw new Error('Missing one or more of required parameters "copyDrivers", "copLaborPositions"');
+    }
+
     const entityDoc = await db.doc(`entities/${rollVersionRequest.entityId}`).get();
     if (!entityDoc.exists) {
       throw new Error(`Could not find entity ${rollVersionRequest.entityId} at [beginRollVersion]. Aborting`);
@@ -18,16 +22,16 @@ export const beginRollVersion = async (rollVersionRequest: RollVersionForEntity,
     let targetPlanVersion = null;
 
     targetPlanVersion = await findEntityVersionSourceDocument(entityDoc.ref, rollVersionRequest);
+
     if (recalcNewVersion) {
       await completeRebuildAndRecalcVersion({
         entityId: entityDoc.id,
         planId: targetPlanVersion.targetPlanId,
         versionId: targetPlanVersion.targetVersionId,
-      });
+      }, true);
     }
 
     return targetPlanVersion;
-    
   } catch (error) {
     throw new Error(`Error occured in [beginRollVersion]: ${error}`);
   }
@@ -77,32 +81,32 @@ const rollVersionForEntity = async (
 
   await prepareVersionDocumentForNewData(sourcePlanRef, sourceVersionRef, targetVersionRef, clearAccountCollections);
 
-  await db.runTransaction(async (firestoreTxRef) => {
-    if (targetVersionRef) {
-      await copyVersionAccounts(
-        sourceVersionRef,
-        targetVersionRef,
-        rollVersionRequest.lockSourceVersion,
-        firestoreTxRef
-      );
-    }
-  });
+  await copyVersionAccounts(sourceVersionRef, targetVersionRef, rollVersionRequest.lockSourceVersion);
 
-  if (rollVersionRequest.copyDrivers) {
+  if (clearAccountCollections) {
+    await clearDriverOrLaborCollection(entityRef, targetVersionRef.id, { main: 'drivers', sub: 'dept' });
+    await clearDriverOrLaborCollection(entityRef, targetVersionRef.id, { main: 'labor', sub: 'positions' });
+  }
+
+  if (rollVersionRequest.copyDrivers === true) {
+    console.log(`copying drivers: ${JSON.stringify(rollVersionRequest)}`);
     await copyDriversOrLaborPositions(entityRef, sourceVersionRef.id, targetPlanRef.id, targetVersionRef.id, {
       main: 'drivers',
       sub: 'dept',
     });
   } else {
+    console.log(`clearing driver flags: ${JSON.stringify(rollVersionRequest)}`);
     await resetAccountCalcFlag(targetVersionRef, 'driver');
   }
 
-  if (rollVersionRequest.copyLaborPositions) {
+  if (rollVersionRequest.copyLaborPositions === true) {
+    console.log(`copying labor: ${JSON.stringify(rollVersionRequest)}`);
     await copyDriversOrLaborPositions(entityRef, sourceVersionRef.id, targetPlanRef.id, targetVersionRef.id, {
-      main: 'drivers',
-      sub: 'dept',
+      main: 'labor',
+      sub: 'positions',
     });
   } else {
+    console.log(`clearing labor flags: ${JSON.stringify(rollVersionRequest)}`);
     await resetAccountCalcFlag(targetVersionRef, 'labor');
   }
 
@@ -189,27 +193,49 @@ const prepareVersionDocumentForNewData = async (
 const copyVersionAccounts = async (
   sourceVersionRef: FirebaseFirestore.DocumentReference,
   targetVersionRef: FirebaseFirestore.DocumentReference,
-  lockSourceVersion: boolean,
-  firestoreCopyTx: FirebaseFirestore.Transaction
+  lockSourceVersion: boolean
 ) => {
-  const sourceVersionDoc = await firestoreCopyTx.get(sourceVersionRef);
-  const targetVersionDoc = await firestoreCopyTx.get(targetVersionRef);
-
   const sourceAccountQuerySnap = await sourceVersionRef.collection('dept').where('class', '==', 'acct').get();
 
+  let txCounter = 0;
+  let batch = db.batch();
+
   for (const sourceAcctDoc of sourceAccountQuerySnap.docs) {
-    firestoreCopyTx.set(targetVersionRef.collection('dept').doc(sourceAcctDoc.id), sourceAcctDoc.data());
+    batch.set(targetVersionRef.collection('dept').doc(sourceAcctDoc.id), sourceAcctDoc.data());
+    txCounter++;
+    if (txCounter > 400) {
+      await batch.commit();
+      batch = db.batch();
+      txCounter = 0;
+    }
+  }
+
+  if (txCounter > 0) {
+    await batch.commit();
   }
 
   const tsNow = admin.firestore.Timestamp.now();
 
-  firestoreCopyTx.update(targetVersionDoc.ref, { last_updated: tsNow });
+  await targetVersionRef.update({ last_updated: tsNow });
 
   if (lockSourceVersion) {
-    firestoreCopyTx.update(sourceVersionDoc.ref, { last_updated: tsNow, is_locked: initializeVersionLockObject(true) });
+    await sourceVersionRef.update({ last_updated: tsNow, is_locked: initializeVersionLockObject(true) });
   } else {
-    firestoreCopyTx.update(sourceVersionDoc.ref, { last_updated: tsNow });
+    await sourceVersionRef.update({ last_updated: tsNow });
   }
+};
+
+const clearDriverOrLaborCollection = async (
+  entityRef: FirebaseFirestore.DocumentReference,
+  targetVersionDocId: string,
+  collectionIDs: { main: string; sub: string }
+) => {
+  const targetLaborOrDriverCollRef = entityRef
+    .collection(collectionIDs.main)
+    .doc(targetVersionDocId)
+    .collection(collectionIDs.sub);
+
+  await deleteCollection(targetLaborOrDriverCollRef, 400);
 };
 
 const copyDriversOrLaborPositions = async (

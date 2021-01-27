@@ -25,6 +25,14 @@ export async function decodeAuthToken(authToken: string) {
     });
 }
 
+const urlMappings = [
+  { source: 'recalc-rebuild-async', target: 'recalcRebuildVersionGCT' },
+  { source: 'version-rollup-recalc', target: 'versionRollupRecalcGCT' },
+  { source: 'roll-version-async', target: 'rollVersionGCT' },
+  { source: 'version-fullcalc-async', target: 'versionFullCalcGCT' },
+  { source: 'rolling-forecast-async', target: 'rollingForecastGCT' },
+];
+
 export async function verifyCloudTaskRequest(request: functions.https.Request, clientId: string) {
   try {
     // decode the id token
@@ -36,7 +44,15 @@ export async function verifyCloudTaskRequest(request: functions.https.Request, c
     // const host = `${projectId}.web.app`;
     const client = new gAuth.OAuth2Client();
 
-    const aud = `https://${projectId}.web.app/${clientId}`;
+    const location = config.taskQueueLoc;
+    const filteredUrlMap = urlMappings.filter((urlMap) => urlMap.source === clientId);
+    if (filteredUrlMap.length === 0) {
+      throw new Error(`Could not find urlMapping for ${clientId}`);
+    }
+
+    //const aud = `https://${projectId}.web.app/${clientId}`;
+    const aud = `https://${location}-${projectId}.cloudfunctions.net/${filteredUrlMap[0].target}`;
+
     console.log(`assumed audience: ${aud}`);
 
     const ticket = await client.verifyIdToken({

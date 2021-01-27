@@ -286,7 +286,7 @@ export const updateRollupEntityVersion = functions
       if (acct_wx_ctr > 0) await acct_wx_batch.commit();
 
       for (const rollupEntityPlanVersion of allRollupEntityPlanVersions) {
-        await completeRebuildAndRecalcVersion(rollupEntityPlanVersion);
+        await completeRebuildAndRecalcVersion(rollupEntityPlanVersion, true);
       }
     } catch (error) {
       console.log(`Error occured while rebuilding rollup entity hierarchy from children: ${error}`);

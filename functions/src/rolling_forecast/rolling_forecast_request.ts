@@ -13,7 +13,7 @@ const db = admin.firestore();
 
 export const requestRollForecast = functions
   .region(config.cloudFuncLoc)
-  .runWith({ timeoutSeconds: 540 })
+  .runWith({ timeoutSeconds: 540, memory: '1GB' })
   .https.onRequest(async (request, response) => {
     cors(request, response, async () => {
       try {
@@ -53,24 +53,32 @@ export const requestRollForecast = functions
 
         const rollingForecastRequest = request.body as RollingForecastRequest;
 
-        if (rollingForecastRequest.entityId) {
-          await beginRollingForecast(rollingForecastRequest as RollingForecastForEntity);
-          response.status(200).send({ result: `Forecast has been rolled successfully.` });
-        } else {
-          console.log('Rolling Forecast requested for all entities. Begin async dispatch');
-          const query = db.collection(`entities`).where('type', '==', 'entity');
-          const entityCollectionSnapshot = await query.get();
+        let query = db.collection(`entities`).where('type', '==', 'entity');
 
-          for (const entityDoc of entityCollectionSnapshot.docs) {
-            console.log(`Dispatching GCT for [rollingForecastGCT] and entity ${entityDoc.id}`);
-            await dispatchGCloudTask(
-              { ...rollingForecastRequest, entityId: entityDoc.id },
-              'rolling-forecast-async',
-              'recalc'
-            );
-          }
-          response.status(200).send({ result: `Tasks for rolling forecasts have been scheduled.` });
+        if (rollingForecastRequest.entityIds && rollingForecastRequest.entityIds.length > 0) {
+          query = query.where(admin.firestore.FieldPath.documentId(), 'in', rollingForecastRequest.entityIds);
         }
+
+        const entityCollectionSnapshot = await query.get();
+
+        let inSeconds = 0;
+        for (const entityDoc of entityCollectionSnapshot.docs) {
+          console.log(`Dispatching GCT for [rollingForecastGCT] and entity ${entityDoc.id}`);
+
+          const { planName, sourceVersionName, targetVersionName, seedMonth } = rollingForecastRequest;
+
+          const rollFcstReqGCT: RollingForecastForEntity = {
+            planName: planName,
+            sourceVersionName: sourceVersionName,
+            targetVersionName: targetVersionName,
+            seedMonth: seedMonth,
+            entityId: entityDoc.id,
+          };
+
+          await dispatchGCloudTask(rollFcstReqGCT, 'rolling-forecast-async', 'general', inSeconds);
+          inSeconds += 30;
+        }
+        response.status(200).send({ result: `Tasks for rolling forecasts have been scheduled.` });
       } catch (error) {
         console.log(`Error occured while rolling forecast month: ${error}`);
         response.status(500).send({ result: `Error occured while rolling forecast month. Please contact support` });
@@ -79,22 +87,25 @@ export const requestRollForecast = functions
   });
 
 //rolling-forecast-async
-export const rollingForecastGCT = functions.region(config.cloudFuncLoc).https.onRequest(async (request, response) => {
-  try {
-    console.log('running [rollingForecastGCT]');
-    // Verify the request
-    await httpsUtils.verifyCloudTaskRequest(request, 'rolling-forecast-async');
+export const rollingForecastGCT = functions
+  .runWith({ timeoutSeconds: 540, memory: '1GB' })
+  .region(config.taskQueueLoc)
+  .https.onRequest(async (request, response) => {
+    try {
+      console.log('running [rollingForecastGCT]');
+      // Verify the request
+      await httpsUtils.verifyCloudTaskRequest(request, 'rolling-forecast-async');
 
-    // get the request body
-    const rollFcstReq = request.body as RollingForecastForEntity;
+      // get the request body
+      const rollFcstReq = request.body as RollingForecastForEntity;
 
-    console.log(`Running rollingForecastGCT with parameters: ${JSON.stringify(rollFcstReq)}`);
+      console.log(`Running rollingForecastGCT with parameters: ${JSON.stringify(rollFcstReq)}`);
 
-    await beginRollingForecast(rollFcstReq);
+      await beginRollingForecast(rollFcstReq);
 
-    response.status(200).send({ result: `rolling forecast completed.` });
-  } catch (error) {
-    console.log(`Error occured while requesting rollingForecastGCT: ${error}. This should be retried.`);
-    response.status(500).send({ result: `Could not execute rollingForecastGCT. Please contact support` });
-  }
-});
+      response.status(200).send({ result: `rolling forecast completed.` });
+    } catch (error) {
+      console.log(`Error occured while requesting rollingForecastGCT: ${error}. This should be retried.`);
+      response.status(500).send({ result: `Could not execute rollingForecastGCT. Please contact support` });
+    }
+  });

@@ -46,7 +46,7 @@ export const planViewGenerateTrigger = functions.firestore
         return;
       }
       console.log(context_params);
-    // await planViewGenerate(context_params);
+      // await planViewGenerate(context_params);
     } catch (error) {}
   });
 

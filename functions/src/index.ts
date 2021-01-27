@@ -58,4 +58,5 @@ export { validateDataToUploadIntoVersion } from './upload_account_data/user_vali
 export { requestUploadDataToVersion } from './upload_account_data/user_upload_request';
 export { requestRollVersion,rollVersionGCT } from './roll_version/roll_version_request';
 export { requestRollForecast, rollingForecastGCT } from './rolling_forecast/rolling_forecast_request';
+export {requestRebuildRecalcVersion, recalcRebuildVersionGCT } from './version_complete_rebuild';
 

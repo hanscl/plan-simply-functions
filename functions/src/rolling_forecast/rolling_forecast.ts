@@ -3,7 +3,6 @@ import * as admin from 'firebase-admin';
 import { RollingForecastForEntity } from './rolling_forecast_model';
 import { beginRollVersion } from '../roll_version/roll_version';
 import { RollVersionForEntity } from '../roll_version/roll_version_model';
-// import { completeRebuildAndRecalcVersion } from '../version_complete_rebuild';
 import { accountDoc, versionDoc } from '../plan_model';
 import { initVersionCalendar } from '../utils/version_calendar';
 import { PositionDoc } from '../labor/labor_model';
@@ -42,14 +41,15 @@ export const beginRollingForecast = async (rollingForecastRequest: RollingForeca
       entityId: entityDoc.id,
       planId: targetPlanVersion.targetPlanId,
       versionId: targetPlanVersion.targetVersionId,
-    });
+    }, true);
   } catch (error) {
     throw new Error(`Error occured in [beginRollingForecast]: ${error}`);
   }
 };
 
 const updateDrivers = async (entityId: string, versionId: string, seedMonth: number) => {
-  const batch = db.batch();
+  let batch = db.batch();
+  let txCtr = 0;
 
   const driverSnap = await db.collection(`entities/${entityId}/drivers/${versionId}/dept`).get();
 
@@ -68,13 +68,22 @@ const updateDrivers = async (entityId: string, versionId: string, seedMonth: num
 
     if (updateThisDriverDoc) {
       batch.update(driverDoc.ref, { drivers: driver.drivers });
+      txCtr++;
+    }
+    if (txCtr > 400) {
+      await batch.commit();
+      batch = db.batch();
+      txCtr = 0;
     }
   }
-  await batch.commit();
+  if (txCtr > 0) {
+    await batch.commit();
+  }
 };
 
 const updateLaborPositions = async (entityId: string, versionId: string, seedMonth: number) => {
-  const batch = db.batch();
+  let batch = db.batch();
+  let txCtr = 0;
 
   const laborPositionSnap = await db.collection(`entities/${entityId}/labor/${versionId}/positions`).get();
 
@@ -82,19 +91,29 @@ const updateLaborPositions = async (entityId: string, versionId: string, seedMon
     const position = positionDoc.data() as PositionDoc;
 
     position.ftes.values.push(position.ftes.values[seedMonth - 1]);
-    position.ftes.values.shift;
+    position.ftes.values.shift();
 
     if (position.bonus_option === 'Value') {
       position.bonus.values.push(position.bonus.values[seedMonth - 1]);
-      position.bonus.values.shift;
+      position.bonus.values.shift();
     }
     batch.update(positionDoc.ref, { bonus: position.bonus, ftes: position.ftes });
+    txCtr++;
+
+    if (txCtr > 400) {
+      await batch.commit();
+      batch = db.batch();
+      txCtr = 0;
+    }
   }
-  await batch.commit();
+  if (txCtr > 0) {
+    await batch.commit();
+  }
 };
 
 const updateAccountEntries = async (versionRef: FirebaseFirestore.DocumentReference, seedMonth: number) => {
-  const batch = db.batch();
+  let batch = db.batch();
+  let txCtr = 0;
 
   const accountQuerySnap = await versionRef.collection('dept').where('class', '==', 'acct').get();
   for (const nLevelAcctDoc of accountQuerySnap.docs) {
@@ -104,9 +123,17 @@ const updateAccountEntries = async (versionRef: FirebaseFirestore.DocumentRefere
       account.values.shift();
 
       batch.update(nLevelAcctDoc.ref, { values: account.values });
+      txCtr++;
+    }
+    if (txCtr > 400) {
+      await batch.commit();
+      batch = db.batch();
+      txCtr = 0;
     }
   }
-  await batch.commit();
+  if (txCtr > 0) {
+    await batch.commit();
+  }
 };
 
 const updateVersionCalendar = async (versionRef: FirebaseFirestore.DocumentReference) => {
