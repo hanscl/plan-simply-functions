@@ -153,7 +153,7 @@ const prepareVersionDocumentForNewData = async (
   clearAccountCollections: boolean
 ) => {
   if (clearAccountCollections) {
-    for (const levelId of ['dept', 'div', 'dept', 'pnl']) {
+    for (const levelId of ['dept', 'div', 'pnl']) {
       await deleteCollection(targetVersionRef.collection(levelId), 400);
     }
   }

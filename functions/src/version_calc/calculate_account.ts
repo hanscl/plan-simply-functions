@@ -66,7 +66,11 @@ export const recalcAnnualTotalsForItemizedEntry = async (versionDocRef: Firebase
     const account = acctDocument.data() as accountDoc;
 
     if (!account.calc_type || account.calc_type === 'entry') {
-      batch.update(acctDocument.ref, 'total', utils.finRound(account.values.reduce((a, b) => a + b, 0)));
+      let acctValsTotal = account.values.reduce((a, b) => a + b, 0);
+      if (account.avg_as_total) {
+        acctValsTotal = acctValsTotal / account.values.length;
+      } 
+      batch.update(acctDocument.ref, 'total', utils.finRound(acctValsTotal));
       txCtr++;
     }
 

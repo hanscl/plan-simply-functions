@@ -73,6 +73,7 @@ export interface accountDoc {
   calc_type?: "entry" | "driver" | "labor" | "entity_rollup";
   is_locked?: boolean;
   comments?: string;
+  avg_as_total?: boolean;
 }
 
 interface parentRollup {
