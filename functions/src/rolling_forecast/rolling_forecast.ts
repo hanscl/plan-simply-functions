@@ -37,142 +37,165 @@ export const beginRollingForecast = async (rollingForecastRequest: RollingForeca
     await updateLaborPositions(entityDoc.id, targetPlanVersion.targetVersionId, seedMonth);
     await updateDrivers(entityDoc.id, targetPlanVersion.targetVersionId, seedMonth);
 
-    await completeRebuildAndRecalcVersion({
-      entityId: entityDoc.id,
-      planId: targetPlanVersion.targetPlanId,
-      versionId: targetPlanVersion.targetVersionId,
-    }, true);
+    await completeRebuildAndRecalcVersion(
+      {
+        entityId: entityDoc.id,
+        planId: targetPlanVersion.targetPlanId,
+        versionId: targetPlanVersion.targetVersionId,
+      },
+      true
+    );
   } catch (error) {
     throw new Error(`Error occured in [beginRollingForecast]: ${error}`);
   }
 };
 
 const updateDrivers = async (entityId: string, versionId: string, seedMonth: number) => {
-  let batch = db.batch();
-  let txCtr = 0;
+  try {
+    let batch = db.batch();
+    let txCtr = 0;
 
-  const driverSnap = await db.collection(`entities/${entityId}/drivers/${versionId}/dept`).get();
+    const driverSnap = await db.collection(`entities/${entityId}/drivers/${versionId}/dept`).get();
 
-  for (const driverDoc of driverSnap.docs) {
-    const driver = driverDoc.data() as acctDriverDef;
-    let updateThisDriverDoc = false;
+    for (const driverDoc of driverSnap.docs) {
+      const driver = driverDoc.data() as acctDriverDef;
+      let updateThisDriverDoc = false;
 
-    for (const driverEntry of driver.drivers) {
-      if (driverEntry.type === 'value') {
-        updateThisDriverDoc = true;
-        const driverValArr = driverEntry.entry as number[];
-        driverValArr.push(driverValArr[seedMonth - 1]);
-        driverValArr.shift();
+      for (const driverEntry of driver.drivers) {
+        if (driverEntry.type === 'value') {
+          updateThisDriverDoc = true;
+          const driverValArr = driverEntry.entry as number[];
+          driverValArr.push(driverValArr[seedMonth - 1]);
+          driverValArr.shift();
+        }
+      }
+
+      if (updateThisDriverDoc) {
+        batch.update(driverDoc.ref, { drivers: driver.drivers });
+        txCtr++;
+      }
+      if (txCtr > 400) {
+        await batch.commit();
+        batch = db.batch();
+        txCtr = 0;
       }
     }
-
-    if (updateThisDriverDoc) {
-      batch.update(driverDoc.ref, { drivers: driver.drivers });
-      txCtr++;
-    }
-    if (txCtr > 400) {
+    if (txCtr > 0) {
       await batch.commit();
-      batch = db.batch();
-      txCtr = 0;
     }
-  }
-  if (txCtr > 0) {
-    await batch.commit();
+  } catch (error) {
+    throw new Error(`Error occured in [updateDrivers]: ${error}`);
   }
 };
 
 const updateLaborPositions = async (entityId: string, versionId: string, seedMonth: number) => {
-  let batch = db.batch();
-  let txCtr = 0;
+  try {
+    let batch = db.batch();
+    let txCtr = 0;
 
-  const laborPositionSnap = await db.collection(`entities/${entityId}/labor/${versionId}/positions`).get();
+    const laborPositionSnap = await db.collection(`entities/${entityId}/labor/${versionId}/positions`).get();
 
-  for (const positionDoc of laborPositionSnap.docs) {
-    const position = positionDoc.data() as PositionDoc;
+    for (const positionDoc of laborPositionSnap.docs) {
+      const position = positionDoc.data() as PositionDoc;
 
-    position.ftes.values.push(position.ftes.values[seedMonth - 1]);
-    position.ftes.values.shift();
+      position.ftes.values.push(position.ftes.values[seedMonth - 1]);
+      position.ftes.values.shift();
 
-    if (position.bonus_option === 'Value') {
-      position.bonus.values.push(position.bonus.values[seedMonth - 1]);
-      position.bonus.values.shift();
+      if (position.bonus_option === 'Value') {
+        position.bonus.values.push(position.bonus.values[seedMonth - 1]);
+        position.bonus.values.shift();
+      }
+      batch.update(positionDoc.ref, { bonus: position.bonus, ftes: position.ftes });
+      txCtr++;
+
+      if (txCtr > 400) {
+        await batch.commit();
+        batch = db.batch();
+        txCtr = 0;
+      }
     }
-    batch.update(positionDoc.ref, { bonus: position.bonus, ftes: position.ftes });
-    txCtr++;
-
-    if (txCtr > 400) {
+    if (txCtr > 0) {
       await batch.commit();
-      batch = db.batch();
-      txCtr = 0;
     }
-  }
-  if (txCtr > 0) {
-    await batch.commit();
+  } catch (error) {
+    throw new Error(`Error occured in [updateLaborPositions]: ${error}`);
   }
 };
 
 const updateAccountEntries = async (versionRef: FirebaseFirestore.DocumentReference, seedMonth: number) => {
-  let batch = db.batch();
-  let txCtr = 0;
+  try {
+    let batch = db.batch();
+    let txCtr = 0;
 
-  const accountQuerySnap = await versionRef.collection('dept').where('class', '==', 'acct').get();
-  for (const nLevelAcctDoc of accountQuerySnap.docs) {
-    const account = nLevelAcctDoc.data() as accountDoc;
-    if (!account.calc_type || account.calc_type === 'entry') {
-      account.values.push(account.values[seedMonth - 1]);
-      account.values.shift();
+    const accountQuerySnap = await versionRef.collection('dept').where('class', '==', 'acct').get();
+    for (const nLevelAcctDoc of accountQuerySnap.docs) {
+      const account = nLevelAcctDoc.data() as accountDoc;
+      if (!account.calc_type || account.calc_type === 'entry') {
+        account.values.push(account.values[seedMonth - 1]);
+        account.values.shift();
 
-      batch.update(nLevelAcctDoc.ref, { values: account.values });
-      txCtr++;
+        batch.update(nLevelAcctDoc.ref, { values: account.values });
+        txCtr++;
+      }
+      if (txCtr > 400) {
+        await batch.commit();
+        batch = db.batch();
+        txCtr = 0;
+      }
     }
-    if (txCtr > 400) {
+    if (txCtr > 0) {
       await batch.commit();
-      batch = db.batch();
-      txCtr = 0;
     }
-  }
-  if (txCtr > 0) {
-    await batch.commit();
+  } catch (error) {
+    throw new Error(`Error occured in [updateAccountEntries]: ${error}`);
   }
 };
 
 const updateVersionCalendar = async (versionRef: FirebaseFirestore.DocumentReference) => {
-  const versionSnap = await versionRef.get();
-  if (!versionSnap.exists) {
-    throw new Error(`Unable to load version document in [updateVersionCalendar]`);
+  try {
+    const versionSnap = await versionRef.get();
+    if (!versionSnap.exists) {
+      throw new Error(`Unable to load version document in [updateVersionCalendar]`);
+    }
+    const versionDocData = versionSnap.data() as versionDoc;
+    if (!versionDocData.begin_month || !versionDocData.begin_year) {
+      throw new Error(`Missing calendar in version document [updateVersionCalendar]`);
+    }
+
+    let newBeginMonth = ++versionDocData.begin_month;
+    let newBeginYear = versionDocData.begin_year;
+
+    if (newBeginMonth > 12) {
+      newBeginMonth = 1;
+      newBeginYear++;
+    }
+
+    const updatedVersionCalendar = initVersionCalendar(newBeginMonth, newBeginYear);
+
+    await versionRef.update({ begin_month: newBeginMonth, begin_year: newBeginYear, periods: updatedVersionCalendar });
+  } catch (error) {
+    throw new Error(`Error occured in [updateVersionCalendar]: ${error}`);
   }
-  const versionDocData = versionSnap.data() as versionDoc;
-  if (!versionDocData.begin_month || !versionDocData.begin_year) {
-    throw new Error(`Missing calendar in version document [updateVersionCalendar]`);
-  }
-
-  let newBeginMonth = ++versionDocData.begin_month;
-  let newBeginYear = versionDocData.begin_year;
-
-  if (newBeginMonth > 12) {
-    newBeginMonth = 1;
-    newBeginYear++;
-  }
-
-  const updatedVersionCalendar = initVersionCalendar(newBeginMonth, newBeginYear);
-
-  await versionRef.update({ begin_month: newBeginMonth, begin_year: newBeginYear, periods: updatedVersionCalendar });
 };
 
 const copyVersionWithoutChanges = async (entityId: string, rollingForecastRequest: RollingForecastForEntity) => {
-  const rollVersionRequest: RollVersionForEntity = {
-    copyDrivers: true,
-    copyLaborPositions: true,
-    lockSourceVersion: true,
-    entityId: entityId,
-    sourcePlanVersion: {
-      planName: rollingForecastRequest.planName,
-      versionName: rollingForecastRequest.sourceVersionName,
-    },
-    targetPlanVersion: {
-      planName: rollingForecastRequest.planName,
-      versionName: rollingForecastRequest.targetVersionName,
-    },
-  };
-  return await beginRollVersion(rollVersionRequest, false);
+  try {
+    const rollVersionRequest: RollVersionForEntity = {
+      copyDrivers: true,
+      copyLaborPositions: true,
+      lockSourceVersion: true,
+      entityId: entityId,
+      sourcePlanVersion: {
+        planName: rollingForecastRequest.planName,
+        versionName: rollingForecastRequest.sourceVersionName,
+      },
+      targetPlanVersion: {
+        planName: rollingForecastRequest.planName,
+        versionName: rollingForecastRequest.targetVersionName,
+      },
+    };
+    return await beginRollVersion(rollVersionRequest, false);
+  } catch (error) {
+    throw new Error(`Error occured in [copyVersionWithoutChanges]: ${error}`);
+  }
 };
