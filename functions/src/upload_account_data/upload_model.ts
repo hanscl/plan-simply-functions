@@ -10,18 +10,18 @@ export interface UploadTemplateCsv {
     gl_acct: string;
     gl_name: string;
     full_account: string;
-    period_01?: number;
-    period_02?: number;
-    period_03?: number;  
-    period_04?: number;
-    period_05?: number;
-    period_06?: number;
-    period_07?: number;
-    period_08?: number;
-    period_09?: number; 
-    period_10?: number;
-    period_11?: number;
-    period_12?: number;
+    period_01?: string;
+    period_02?: string;
+    period_03?: string;  
+    period_04?: string;
+    period_05?: string;
+    period_06?: string;
+    period_07?: string;
+    period_08?: string;
+    period_09?: string; 
+    period_10?: string;
+    period_11?: string;
+    period_12?: string;
 }
 
 export interface AccountDataRow {

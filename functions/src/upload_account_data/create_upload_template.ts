@@ -64,18 +64,18 @@ async function buildReportJson(templateParams: UploadTemplateRequest): Promise<U
         gl_name: account.acct_name,
       };
 
-      csvLine.period_01 = 0;
-      csvLine.period_02 = 0;
-      csvLine.period_03 = 0;
-      csvLine.period_04 = 0;
-      csvLine.period_05 = 0;
-      csvLine.period_06 = 0;
-      csvLine.period_07 = 0;
-      csvLine.period_08 = 0;
-      csvLine.period_09 = 0;
-      csvLine.period_10 = 0;
-      csvLine.period_11 = 0;
-      csvLine.period_12 = 0;
+      csvLine.period_01 = '';
+      csvLine.period_02 = '';
+      csvLine.period_03 = '';
+      csvLine.period_04 = '';
+      csvLine.period_05 = '';
+      csvLine.period_06 = '';
+      csvLine.period_07 = '';
+      csvLine.period_08 = '';
+      csvLine.period_09 = '';
+      csvLine.period_10 = '';
+      csvLine.period_11 = '';
+      csvLine.period_12 = '';
 
       temmplateObject.push(csvLine);
     }

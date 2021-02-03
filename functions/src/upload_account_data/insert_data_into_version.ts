@@ -26,6 +26,9 @@ export const insertDataIntoVersion = async (uploadDataRequest: UploadAccountData
       existingNLevelAccounts.push({ fullAccount: acctData.full_account, calcType: acctData.calc_type });
     }
 
+    // Drop the header row
+    uploadDataRequest.data.shift();
+
     await db.runTransaction(async (firestoreTxRef) => {
       const versionDoc = await firestoreTxRef.get(versionRef);
 

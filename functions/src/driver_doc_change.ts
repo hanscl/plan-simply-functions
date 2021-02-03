@@ -61,7 +61,25 @@ export const driverDocCreate = functions.firestore
   .onCreate(async (snapshot, context) => {
     try {
       // ensure that we have a driver doc for this version & create it if we don't
-      await createVersionDriverDoc(context.params.entityId, context.params.versionId);
+      const planId = await createVersionDriverDoc(context.params.entityId, context.params.versionId);
+
+      // check that we got a planId
+      if(planId === null) {
+        throw new Error(`No plan Id found`);
+      } else {
+        // make sure the version is fully calculated
+        console.log(`entities/${context.params.entityId}/plans/${planId}/versions/${context.params.versionId}`);
+        const versionSnap = await db.doc(`entities/${context.params.entityId}/plans/${planId}/versions/${context.params.versionId}`).get();
+        if(versionSnap.exists) {
+          if ((versionSnap.data() as versionDoc).calculated === false) {
+            console.log(`This version is not fully calculated yet. Exit function`);
+            return;
+          }
+          else {
+            throw new Error(`VERSION DOC NOT FOUND`);
+          }
+        }
+      }
 
       if (await driverDocNullCheck(snapshot)) {
         console.log(`drivers were updated. exit function -- this will be called again`);
@@ -134,11 +152,13 @@ async function createVersionDriverDoc(entity_id: string, version_id: string) {
       const version_doc = await plan.ref.collection(`versions`).doc(version_id).get();
       if (version_doc.exists) {
         await db.doc(`entities/${entity_id}/drivers/${version_id}`).set({ version_id: version_id, plan_id: plan.id });
-        return;
+        return plan.id;
       }
     }
+    return null;
   } catch (error) {
     console.log(`Error during [createVersionDriverDoc]: ${error}`);
+    return null;
   }
 }
 

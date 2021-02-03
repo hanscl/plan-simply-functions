@@ -25,6 +25,9 @@ export const validateUploadedData = async (uploadDataRequest: UploadAccountDataR
     }
     console.log(`Accounts found for check. [1] Itemized Entry: ${validAccounts}, [2] Driver or Labor: ${driverLaborAccounts}`);
 
+    // Drop the header row
+    uploadDataRequest.data.shift();
+
     // make sure all accounts are valid
     const invalidAccounts = uploadDataRequest.data.filter(
       (accountRow) => !(validAccounts.includes(accountRow.full_account) || driverLaborAccounts.includes(accountRow.full_account))
@@ -43,7 +46,14 @@ export const validateUploadedData = async (uploadDataRequest: UploadAccountDataR
     
     // confirm that all values are numbers
     const nanAccountRows = uploadDataRequest.data.filter(
-      (accountRow) => !accountRow.values.every((val) => !isNaN(val))
+      (accountRow) => {
+        const everyResult = accountRow.values.every((val) => {
+          const isNanRes = val === null || isNaN(val);
+          // console.log(`VAL [${val}] is NaN? ${isNanRes}`);
+          return !isNanRes;}
+          );
+        console.log(`RESULT of every: ${everyResult}`);
+        return !everyResult;}
     );
 
     console.log(`Array of rows with at least one NaN: ${JSON.stringify(nanAccountRows)}`);

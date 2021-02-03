@@ -133,7 +133,6 @@ const updateAccountEntries = async (versionRef: FirebaseFirestore.DocumentRefere
       if (!account.calc_type || account.calc_type === 'entry') {
         account.values.push(account.values[seedMonth - 1]);
         account.values.shift();
-
         batch.update(nLevelAcctDoc.ref, { values: account.values });
         txCtr++;
       }

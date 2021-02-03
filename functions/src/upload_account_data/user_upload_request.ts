@@ -51,7 +51,10 @@ export const requestUploadDataToVersion = functions
           return;
         }
 
+        
         const uploadDataRequest = request.body as UploadAccountDataRequest;
+
+        console.log(`RECEIVED UPLOAD DATA REQUEST: ${JSON.stringify(uploadDataRequest)}`);
 
         await insertDataIntoVersion(uploadDataRequest);
 

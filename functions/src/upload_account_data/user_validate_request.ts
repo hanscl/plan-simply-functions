@@ -51,6 +51,8 @@ export const validateDataToUploadIntoVersion = functions
 
         const uploadDataRequest = request.body as UploadAccountDataRequest;
 
+        console.log(`UPLOAD FOR VALIDATE:', ${JSON.stringify(uploadDataRequest)}`);
+
         const returnResult = await validateUploadedData(uploadDataRequest);
         response.status(200).send(returnResult);
       } catch (error) {
