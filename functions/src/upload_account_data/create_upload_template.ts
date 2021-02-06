@@ -41,6 +41,18 @@ async function buildReportJson(templateParams: UploadTemplateRequest): Promise<U
 
     const temmplateObject: UploadTemplateCsv[] = [];
 
+    // load STAT accounts (!!SORTED!!)
+    const statAcctSnap = await entity_snap.ref
+      .collection(`plans/${templateParams.planId}/versions/${templateParams.versionId}/dept`)
+      .where('class', '==', 'acct')
+      .where('acct_type', '==', 'STATS')
+      .orderBy('template_position', 'asc')
+      .get();
+
+    for (const statAcctDoc of statAcctSnap.docs) {
+      addAcctsToTemplate(temmplateObject, statAcctDoc, entity);
+    }
+
     // load all accounts from this version
     const acctVersionSnap = await entity_snap.ref
       .collection(`plans/${templateParams.planId}/versions/${templateParams.versionId}/dept`)
@@ -48,36 +60,7 @@ async function buildReportJson(templateParams: UploadTemplateRequest): Promise<U
       .get();
 
     for (const acctDoc of acctVersionSnap.docs) {
-      const account = acctDoc.data() as accountDoc;
-      const fullAccount = utils.buildFullAccountString([entity.full_account], {
-        dept: account.dept,
-        acct: account.acct,
-        div: account.div,
-      });
-
-      // Create the basic CSV_line
-      const csvLine: UploadTemplateCsv = {
-        company: entity.number,
-        cost_center: account.dept ? account.dept : '',
-        full_account: fullAccount,
-        gl_acct: account.acct,
-        gl_name: account.acct_name,
-      };
-
-      csvLine.period_01 = '';
-      csvLine.period_02 = '';
-      csvLine.period_03 = '';
-      csvLine.period_04 = '';
-      csvLine.period_05 = '';
-      csvLine.period_06 = '';
-      csvLine.period_07 = '';
-      csvLine.period_08 = '';
-      csvLine.period_09 = '';
-      csvLine.period_10 = '';
-      csvLine.period_11 = '';
-      csvLine.period_12 = '';
-
-      temmplateObject.push(csvLine);
+      addAcctsToTemplate(temmplateObject, acctDoc, entity);
     }
 
     console.log(`report obj before return: ${JSON.stringify(temmplateObject)}`);
@@ -88,3 +71,40 @@ async function buildReportJson(templateParams: UploadTemplateRequest): Promise<U
     return undefined;
   }
 }
+
+const addAcctsToTemplate = (
+  temmplateObject: UploadTemplateCsv[],
+  acctDoc: FirebaseFirestore.DocumentSnapshot,
+  entity: entityDoc
+) => {
+  const account = acctDoc.data() as accountDoc;
+  const fullAccount = utils.buildFullAccountString([entity.full_account], {
+    dept: account.dept,
+    acct: account.acct,
+    div: account.div,
+  });
+
+  // Create the basic CSV_line
+  const csvLine: UploadTemplateCsv = {
+    company: entity.number,
+    cost_center: account.dept ? account.dept : '',
+    full_account: fullAccount,
+    gl_acct: account.acct,
+    gl_name: account.acct_name,
+  };
+
+  csvLine.period_01 = '';
+  csvLine.period_02 = '';
+  csvLine.period_03 = '';
+  csvLine.period_04 = '';
+  csvLine.period_05 = '';
+  csvLine.period_06 = '';
+  csvLine.period_07 = '';
+  csvLine.period_08 = '';
+  csvLine.period_09 = '';
+  csvLine.period_10 = '';
+  csvLine.period_11 = '';
+  csvLine.period_12 = '';
+
+  temmplateObject.push(csvLine);
+};

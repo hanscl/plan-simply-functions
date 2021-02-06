@@ -7,7 +7,9 @@ const db = admin.firestore();
 
 export const validateUploadedData = async (uploadDataRequest: UploadAccountDataRequest) => {
   try {
-    console.log(`entities/${uploadDataRequest.entityId}/plans/${uploadDataRequest.planId}/versions/${uploadDataRequest.versionId}`);
+    console.log(
+      `entities/${uploadDataRequest.entityId}/plans/${uploadDataRequest.planId}/versions/${uploadDataRequest.versionId}`
+    );
     const versionDocRef = db.doc(
       `entities/${uploadDataRequest.entityId}/plans/${uploadDataRequest.planId}/versions/${uploadDataRequest.versionId}`
     );
@@ -23,16 +25,19 @@ export const validateUploadedData = async (uploadDataRequest: UploadAccountDataR
         driverLaborAccounts.push(account.full_account);
       }
     }
-    console.log(`Accounts found for check. [1] Itemized Entry: ${validAccounts}, [2] Driver or Labor: ${driverLaborAccounts}`);
+    console.log(
+      `Accounts found for check. [1] Itemized Entry: ${validAccounts}, [2] Driver or Labor: ${driverLaborAccounts}`
+    );
 
     // Drop the header row
     uploadDataRequest.data.shift();
 
     // make sure all accounts are valid
     const invalidAccounts = uploadDataRequest.data.filter(
-      (accountRow) => !(validAccounts.includes(accountRow.full_account) || driverLaborAccounts.includes(accountRow.full_account))
+      (accountRow) =>
+        !(validAccounts.includes(accountRow.full_account) || driverLaborAccounts.includes(accountRow.full_account))
     );
-    
+
     console.log(`Array of invalid accounts: ${JSON.stringify(invalidAccounts)}`);
 
     if (invalidAccounts.length > 0) {
@@ -43,18 +48,13 @@ export const validateUploadedData = async (uploadDataRequest: UploadAccountDataR
         )}`,
       };
     }
-    
+
     // confirm that all values are numbers
-    const nanAccountRows = uploadDataRequest.data.filter(
-      (accountRow) => {
-        const everyResult = accountRow.values.every((val) => {
-          const isNanRes = val === null || isNaN(val);
-          // console.log(`VAL [${val}] is NaN? ${isNanRes}`);
-          return !isNanRes;}
-          );
-        console.log(`RESULT of every: ${everyResult}`);
-        return !everyResult;}
-    );
+    const nanAccountRows = uploadDataRequest.data.filter((accountRow) => {
+      const everyResult = accountRow.values.every((val) => !isNaN(val));
+      console.log(`RESULT of every: ${everyResult}`);
+      return !everyResult;
+    });
 
     console.log(`Array of rows with at least one NaN: ${JSON.stringify(nanAccountRows)}`);
 
@@ -72,19 +72,23 @@ export const validateUploadedData = async (uploadDataRequest: UploadAccountDataR
       driverLaborAccounts.includes(row.full_account)
     );
 
-    console.log(`Driver or Labor accounts to be overwritten with vallues: ${JSON.stringify(uploadAccountsIntoDriverLabor)}`);
+    console.log(
+      `Driver or Labor accounts to be overwritten with values: ${JSON.stringify(uploadAccountsIntoDriverLabor)}`
+    );
 
     if (uploadAccountsIntoDriverLabor.length > 0) {
       return {
-        status: 'WARNING',
-        message: `The following accounts are currently dynamically calculated. Uploading your data will remove the will overwrite the values and remove associated driver or labor positions: ${JSON.stringify(
+        status: 'ERROR',
+        message: `The following accounts are currently dynamically calculated and cannot be overwritten via upload: ${JSON.stringify(
           uploadAccountsIntoDriverLabor.map((acct) => acct.full_account)
         )}`,
       };
     }
 
-    return {status: 'OK', message: 'Validation successful. Proceed with upload.'};
+    return { status: 'OK', message: 'Validation successful. Proceed with upload.' };
   } catch (error) {
     throw new Error(`Error occured in [validateUploadedData]: ${error}`);
   }
 };
+
+// const checkAndMergeAccountRow = () => {};
