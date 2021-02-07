@@ -30,7 +30,8 @@ export interface AccountDataRow {
     gl_acct: string;
     gl_name: string;
     full_account: string;
-    values: number[]; // must be length = 12 
+    values: any[]; // must be length = 12 
+    overwriteVals: boolean[];
 }
 
 
