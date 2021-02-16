@@ -95,7 +95,7 @@ const updateLaborAccountsInFirestore = async (calcRequest: CalcRequest, laborAcc
           db.doc(
             `entities/${calcRequest.entityId}/plans/${calcRequest.planId}/versions/${calcRequest.versionId}/dept/${laborAccount.acctId}`
           ),
-          { total: laborAccount.total, values: laborAccount.values, calc_type: 'labor' }
+          { total: laborAccount.total, values: laborAccount.values, calc_type: 'labor', is_locked: true }
         );
         batchCounter++;
       }

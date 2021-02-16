@@ -212,6 +212,18 @@ async function updateLaborAccounts(
     // TODO: optimize this code, please
     if (posReq.action === 'delete') {
       if (!positionData) throw new Error('Unable to locate position to be deleted');
+
+      await resetGLAccountAndLockStatus(
+        posReq.entityId,
+        posReq.planId,
+        posReq.versionId,
+        positionData.div,
+        positionData.dept,
+        positionData.acct,
+        [acctFormatString],
+        'removed'
+      );
+
       await scheduleCloudTaskRecalc(
         entityData,
         posReq,
@@ -221,6 +233,7 @@ async function updateLaborAccounts(
         wagesBefore,
         wagesAfter
       );
+
       if (posReq.laborVersion > 1) {
         await scheduleCloudTaskRecalc(
           entityData,
@@ -248,6 +261,17 @@ async function updateLaborAccounts(
         posReq.entityId,
         posReq.versionId,
         utils.buildFullAccountString([acctFormatString], { ...acctComponents, acct: posReq.data?.acct })
+      );
+
+      await resetGLAccountAndLockStatus(
+        posReq.entityId,
+        posReq.planId,
+        posReq.versionId,
+        newPosDiv,
+        posReq.data.dept,
+        posReq.data?.acct,
+        [acctFormatString],
+        'added'
       );
 
       await scheduleCloudTaskRecalc(
@@ -292,6 +316,17 @@ async function updateLaborAccounts(
     } else {
       if (!positionData || !posReq.data) throw new Error('Need existing position and data object to update position');
       if (posReq.data.dept !== positionData.dept) {
+        await resetGLAccountAndLockStatus(
+          posReq.entityId,
+          posReq.planId,
+          posReq.versionId,
+          positionData.div,
+          positionData.dept,
+          positionData.acct,
+          [acctFormatString],
+          'removed'
+        );
+
         // delete values from previous account
         await scheduleCloudTaskRecalc(
           entityData,
@@ -329,6 +364,18 @@ async function updateLaborAccounts(
           posReq.versionId,
           utils.buildFullAccountString([acctFormatString], { ...acctComponents, acct: posReq.data?.acct })
         );
+
+        await resetGLAccountAndLockStatus(
+          posReq.entityId,
+          posReq.planId,
+          posReq.versionId,
+          newPosDiv,
+          posReq.data.dept,
+          posReq.data?.acct,
+          [acctFormatString],
+          'added'
+        );
+
         await scheduleCloudTaskRecalc(
           entityData,
           posReq,
@@ -369,6 +416,17 @@ async function updateLaborAccounts(
           );
         }
       } else if (posReq.data.acct !== positionData.acct) {
+        await resetGLAccountAndLockStatus(
+          posReq.entityId,
+          posReq.planId,
+          posReq.versionId,
+          positionData.div,
+          positionData.dept,
+          positionData.acct,
+          [acctFormatString],
+          'removed'
+        );
+
         // new wage account only -- process both
         await scheduleCloudTaskRecalc(
           entityData,
@@ -386,6 +444,18 @@ async function updateLaborAccounts(
           posReq.versionId,
           utils.buildFullAccountString([acctFormatString], { ...acctComponents, acct: posReq.data?.acct })
         );
+
+        await resetGLAccountAndLockStatus(
+          posReq.entityId,
+          posReq.planId,
+          posReq.versionId,
+          newPosDiv,
+          posReq.data.dept,
+          posReq.data?.acct,
+          [acctFormatString],
+          'added'
+        );
+
         await scheduleCloudTaskRecalc(
           entityData,
           posReq,
@@ -427,6 +497,7 @@ async function updateLaborAccounts(
           );
         }
       } else {
+        // dept AND acct unchanged; no acct reset or lock update necessary
         // add values to new account
         const acctComponents = { div: newPosDiv, dept: posReq.data.dept };
         await deleteDriverDefinition(
@@ -706,3 +777,64 @@ function checkEntityLaborDefs(entityLabor: entityModel.LaborSettings) {
     throw new Error(`Error occured in [checkEntityLaborCalcs]: ${error}`);
   }
 }
+
+const resetGLAccountAndLockStatus = async (
+  entityId: string,
+  planId: string,
+  versionId: string,
+  div: string,
+  dept: string,
+  acct: string,
+  acctFormatString: string[],
+  positionTrigger: 'added' | 'removed'
+) => {
+  const fullAccount = utils.buildFullAccountString(acctFormatString, {
+    div: div,
+    dept: dept,
+    acct: acct,
+  });
+
+  const laborPositionCollection = db.collection(`entities/${entityId}/labor/${versionId}/positions`);
+  const versionAccountDoc = db.doc(`entities/${entityId}/plans/${planId}/versions/${versionId}/dept/${fullAccount}`);
+
+  // calc_flag
+  if (positionTrigger === 'added') {
+    console.log(`[resetGLAccountAndLockStatus] locking account ${fullAccount} and checking if values need to be reset`);
+    await versionAccountDoc.update({ is_locked: true, calc_type: 'labor' });
+
+    // see if we have other positions on this account
+    const posQuerySnap = await laborPositionCollection.where('acct', '==', acct).where('dept', '==', dept).get();
+
+    if (posQuerySnap.empty) {
+      console.log(`[resetGLAccountAndLockStatus] first position for account ${fullAccount}. Resetting values to zero`);
+      await rollupRecalc.beginVersionRollupRecalc(
+        {
+          entity_id: entityId,
+          plan_id: planId,
+          version_id: versionId,
+          dept: dept,
+          acct_id: fullAccount,
+          values: utils.getValuesArray(),
+        },
+        false,
+        'entry'
+      );
+    }
+  } else if (positionTrigger === 'removed') {
+    console.log(`[resetGLAccountAndLockStatus] checking if account ${fullAccount} needs to be unlocked`);
+
+    const posQuerySnap = await laborPositionCollection.where('acct', '==', acct).where('dept', '==', dept).get();
+
+    if(posQuerySnap.docs.length === 1) { // we are deleting the last position for this account
+      await versionAccountDoc.update({ is_locked: false}); 
+      
+      // also reset the calc_typ; TODO: move to expense  caslc
+      setTimeout(async () => {
+        await versionAccountDoc.update({ calc_type: 'entry'}); 
+        console.log(`[resetGLAccountAndLockStatus] updated calc_type`);
+      }, 5000)
+    }
+  }
+  console.log(`[resetGLAccountAndLockStatus] complete`);
+
+};
