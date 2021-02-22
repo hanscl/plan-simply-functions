@@ -41,9 +41,9 @@ interface ActiveRecalcDoc {
   expires_at: FirebaseFirestore.Timestamp;
 }
 
-const calculationDelayInSeconds = 240;
+const calculationDelayInSeconds = 120;
 
-const rebuildAndRecalcRollupEntityVersion = async ({ entityId, planName, versionName }: RollupRecalcParams) => {
+const rebuildAndRecalcRollupEntityVersion = async (entityId: string, planName: string, versionName: string) => {
   try {
     // create the batch
     let acct_wx_batch = db.batch();
@@ -51,6 +51,8 @@ const rebuildAndRecalcRollupEntityVersion = async ({ entityId, planName, version
 
     // create the empty array for all the version accounts
     const rollup_version_accts: plan_model.accountDoc[] = [];
+
+    console.log(`ENTITY ID: ${entityId} - PLAN NAME: ${planName} - VERSION NAME: ${versionName}`);
 
     // // process all rollup entities
     // for (const rollup_entity_doc of rollup_entities_snap.docs) {
@@ -73,12 +75,13 @@ const rebuildAndRecalcRollupEntityVersion = async ({ entityId, planName, version
 
     // check if version already exists => it if does then delete its collections and save the reference
     let existingRollupVersionRef = undefined;
-    const parentVersionSnap = await rollupEntityDocSnap.ref
+    const parentVersionSnap = await parentPlanQuerySnap.docs[0].ref
       .collection('versions')
       .where('name', '==', versionName)
       .get();
 
     if (!parentVersionSnap.empty) {
+      console.log(`found version for rollup entity: ${parentVersionSnap.docs[0].id}`);
       existingRollupVersionRef = parentVersionSnap.docs[0].ref;
       for (const coll_id of ['dept', 'div', 'pnl'])
         await utils.deleteCollection(existingRollupVersionRef.collection(coll_id), 300);
@@ -144,6 +147,17 @@ const rebuildAndRecalcRollupEntityVersion = async ({ entityId, planName, version
       throw new Error(`no child with matching plan/versions found for this rollup`);
     }
 
+    // get the highest version number for this entity's plan-versions
+    let versionNumber = 0;
+    const versionNumberQuerySnap = await parentPlanQuerySnap.docs[0].ref
+      .collection('versions')
+      .orderBy('number', 'desc')
+      .limit(1)
+      .get();
+    if (!versionNumberQuerySnap.empty) {
+      versionNumber = (versionNumberQuerySnap.docs[0].data() as plan_model.versionDoc).number + 1;
+    }
+
     // DB: Create the version doc
     const version_doc: plan_model.versionDoc = {
       last_update: admin.firestore.Timestamp.now(),
@@ -151,9 +165,8 @@ const rebuildAndRecalcRollupEntityVersion = async ({ entityId, planName, version
       ready_for_view: false,
       child_version_ids: childVersionIds,
       name: versionName,
-      number: 0,
+      number: versionNumber,
       // ASSIGN CALENDAR FROM FIRST VERSION: TODO => THIS IS NOT IDEAL, ASSUMES CONSISTENCY OF ALL CHILD VERSIONS
-
       begin_year: childVersions[0].data.begin_year,
       begin_month: childVersions[0].data.begin_month,
       periods: childVersions[0].data.periods,
@@ -164,6 +177,7 @@ const rebuildAndRecalcRollupEntityVersion = async ({ entityId, planName, version
 
     // DB: version doc to batch
     if (existingRollupVersionRef === undefined) {
+      console.log(`creating new version for rollup entity ..`);
       existingRollupVersionRef = rollupEntityDocSnap.ref.collection('versions').doc();
     }
     const versionId = existingRollupVersionRef.id;
@@ -301,7 +315,12 @@ export const updateRollupEntityVersion = functions
         // const recalcExpiresAt = admin.firestore.Timestamp.now()
         if (!lastPendingFutureRecalcDocSnap.empty) {
           const recalcDoc = lastPendingFutureRecalcDocSnap.docs[0].data() as ActiveRecalcDoc;
-          startDateTime = recalcDoc.expires_at.toDate();
+          const lastExpiryrecalcDoc = recalcDoc.expires_at.toDate();
+          console.log(`found recalc for this entity, which is expiring at ${JSON.stringify(lastExpiryrecalcDoc)}`)
+          if (lastExpiryrecalcDoc.getTime() > new Date().getTime()) {
+            startDateTime = recalcDoc.expires_at.toDate();
+            console.log(`last recalc is expiring in the future; use this for our new calc: ${JSON.stringify(startDateTime)}`)
+          }
         }
         const expirationDateTimeInMillis = startDateTime.getTime() + calculationDelayInSeconds * 1000;
         const calcExpiresDoc: ActiveRecalcDoc = {
@@ -311,10 +330,16 @@ export const updateRollupEntityVersion = functions
           expires_at: admin.firestore.Timestamp.fromMillis(expirationDateTimeInMillis),
         };
 
+        console.log(`Adding expiration doc to database: ${JSON.stringify(calcExpiresDoc)}`);
         // save to database
         const writeResult = await db.collection('active_recalcs').add(calcExpiresDoc);
-        const inSeconds = Math.max(0, startDateTime.getTime() - new Date().getTime()) * 1000;
+        console.log(`Write Result is: ${JSON.stringify(writeResult)}`);
+        const startDiffInMillis = startDateTime.getTime() - (new Date().getTime());
+        const inSeconds = Math.max(0, startDiffInMillis) / 1000;
 
+        console.log(
+          `Dispatching entity rollup recalc in ${inSeconds} seconds (${startDiffInMillis} millis) for ${parentEntityDoc.id}, ${planName}, ${versionName}`
+        );
         // call GCT
         const gctReq: RollupEntityRecalcRequest = {
           activeRecalcDocId: writeResult.id,
@@ -336,7 +361,7 @@ export const entityRollupVersionRebuildRecalcGCT = functions
   .region(taskQueueLoc)
   .https.onRequest(async (request, response) => {
     try {
-      console.log('running [recalcRebuildVersionGCT]');
+      console.log('running [entityRollupVersionRebuildRecalcGCT]');
       // Verify the request
       await verifyCloudTaskRequest(request, 'entity-rollup-version-rebuild-recalc');
 
@@ -347,19 +372,24 @@ export const entityRollupVersionRebuildRecalcGCT = functions
         `Running Rollup Entity Rebuild/Recalc with parameters: ${JSON.stringify(entityRollupRebuildRequest)}`
       );
 
-      await rebuildAndRecalcRollupEntityVersion(entityRollupRebuildRequest.recalcParams);
+      const { entityId, planName, versionName } = entityRollupRebuildRequest.recalcParams;
+      await rebuildAndRecalcRollupEntityVersion(entityId, planName, versionName);
 
+      await db.doc(`active_recalcs/${entityRollupRebuildRequest.activeRecalcDocId}`).delete();
       response.status(200).send({ result: `recalc/rebuild completed.` });
     } catch (error) {
+      const entityRollupRebuildRequest = request.body as RollupEntityRecalcRequest;
+      await db.doc(`active_recalcs/${entityRollupRebuildRequest.activeRecalcDocId}`).delete();
       console.log(
         `Error occured while requesting entityRollupVersionRebuildRecalcGCT: ${error}. This should be retried.`
       );
       response
         .status(500)
         .send({ result: `Could not execute entityRollupVersionRebuildRecalcGCT. Please contact support` });
-    } finally {
-      // get the request body
-      const entityRollupRebuildRequest = request.body as RollupEntityRecalcRequest;
-      await db.doc(`active_recalcs/${entityRollupRebuildRequest.activeRecalcDocId}`).delete();
-    }
+      }
+    // } finally {
+    //   // get the request body
+    //   const entityRollupRebuildRequest = request.body as RollupEntityRecalcRequest;
+    //   await db.doc(`active_recalcs/${entityRollupRebuildRequest.activeRecalcDocId}`).delete();
+    // }
   });
