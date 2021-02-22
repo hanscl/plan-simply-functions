@@ -3,14 +3,6 @@ import * as protos from '@google-cloud/tasks/build/protos/protos';
 
 import * as config from './config';
 
-const urlMappings = [
-  { source: 'version-fullcalc-async', target: 'versionFullCalcGCT' },
-  { source: 'recalc-rebuild-async', target: 'recalcRebuildVersionGCT' },
-  { source: 'version-rollup-recalc', target: 'versionRollupRecalcGCT' },
-  { source: 'roll-version-async', target: 'rollVersionGCT' },
-  { source: 'rolling-forecast-async', target: 'rollingForecastGCT' },
-];
-
 export async function dispatchGCloudTask(
   payload: object,
   urlExt: string,
@@ -26,7 +18,7 @@ export async function dispatchGCloudTask(
 
     const location = config.taskQueueLoc;
     //    const url = `https://${projectId}.web.app/${urlExt}`;
-    const filteredUrlMap = urlMappings.filter((urlMap) => urlMap.source === urlExt);
+    const filteredUrlMap = config.urlMappings.filter((urlMap) => urlMap.source === urlExt);
     if (filteredUrlMap.length === 0) {
       throw new Error(`Could not find urlMapping for ${urlExt}`);
     }

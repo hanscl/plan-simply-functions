@@ -98,7 +98,7 @@ export const requestRebuildRecalcVersion = functions
           const planVersion = rebuildRecalcRequest.params as RebuildRecalcMultiEntity;
 
           console.log(
-            `Version rebuild/recalc requested for all entities: [${JSON.stringify(planVersion)}]. Begin async dispatch`
+            `Version rebuild/recalc requested for multiple entities: [${JSON.stringify(planVersion)}]. Begin async dispatch`
           );
 
           let query = db.collection(`entities`) as FirebaseFirestore.Query;

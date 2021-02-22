@@ -1,15 +1,15 @@
-import * as functions from "firebase-functions";
-import * as admin from "firebase-admin";
-import * as gAuth from "google-auth-library";
-import * as config from "../config";
+import * as functions from 'firebase-functions';
+import * as admin from 'firebase-admin';
+import * as gAuth from 'google-auth-library';
+import * as config from '../config';
 
 export function validateHeader(req: functions.https.Request) {
-  if (req.headers.authorization && req.headers.authorization.startsWith("Bearer ")) {
-    console.log("auth header found");
-    return req.headers.authorization.split("Bearer ")[1];
+  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+    console.log('auth header found');
+    return req.headers.authorization.split('Bearer ')[1];
   }
 
-  return "";
+  return '';
 }
 
 export async function decodeAuthToken(authToken: string) {
@@ -25,13 +25,6 @@ export async function decodeAuthToken(authToken: string) {
     });
 }
 
-const urlMappings = [
-  { source: 'recalc-rebuild-async', target: 'recalcRebuildVersionGCT' },
-  { source: 'version-rollup-recalc', target: 'versionRollupRecalcGCT' },
-  { source: 'roll-version-async', target: 'rollVersionGCT' },
-  { source: 'version-fullcalc-async', target: 'versionFullCalcGCT' },
-  { source: 'rolling-forecast-async', target: 'rollingForecastGCT' },
-];
 
 export async function verifyCloudTaskRequest(request: functions.https.Request, clientId: string) {
   try {
@@ -39,13 +32,13 @@ export async function verifyCloudTaskRequest(request: functions.https.Request, c
     const oidcToken = validateHeader(request);
 
     const projectId = config.getProjectId();
-    if (!projectId) throw new Error("No Project ID found");
+    if (!projectId) throw new Error('No Project ID found');
 
     // const host = `${projectId}.web.app`;
     const client = new gAuth.OAuth2Client();
 
     const location = config.taskQueueLoc;
-    const filteredUrlMap = urlMappings.filter((urlMap) => urlMap.source === clientId);
+    const filteredUrlMap =config.urlMappings.filter((urlMap) => urlMap.source === clientId);
     if (filteredUrlMap.length === 0) {
       throw new Error(`Could not find urlMapping for ${clientId}`);
     }
@@ -66,10 +59,10 @@ export async function verifyCloudTaskRequest(request: functions.https.Request, c
     // verify that the request came from the correct service account
     if (payload.email !== `cloud-tasks@${projectId}.iam.gserviceaccount.com`)
       throw new Error(`Cloud Task Request made by invalid email: ${payload.email}. Do not process!`);
-    
+
     return Promise.resolve();
   } catch (error) {
     console.log(`Error occured while verifying Cloud Task Request: ${error}`);
-    return Promise.reject(new Error("Verify Cloud Task Request failed."));
+    return Promise.reject(new Error('Verify Cloud Task Request failed.'));
   }
 }

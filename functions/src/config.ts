@@ -11,3 +11,12 @@ export function getProjectId(): string | undefined {
 
   return JSON.parse(fb_config).projectId;
 }
+
+export const urlMappings = [
+  { source: 'version-fullcalc-async', target: 'versionFullCalcGCT' },
+  { source: 'recalc-rebuild-async', target: 'recalcRebuildVersionGCT' },
+  { source: 'version-rollup-recalc', target: 'versionRollupRecalcGCT' },
+  { source: 'roll-version-async', target: 'rollVersionGCT' },
+  { source: 'rolling-forecast-async', target: 'rollingForecastGCT' },
+  { source: 'entity-rollup-version-rebuild-recalc', target: 'entityRollupVersionRebuildRecalcGCT'}
+];
