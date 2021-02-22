@@ -42,7 +42,7 @@ interface ActiveRecalcDoc {
 }
 
 const calculationDelayInSeconds = 120;
-const initialDelayInSeconds = 90;
+const initialDelayInSeconds = 30;
 
 const rebuildAndRecalcRollupEntityVersion = async (entityId: string, planName: string, versionName: string) => {
   try {
@@ -303,10 +303,10 @@ export const updateRollupEntityVersion = functions
       for (const parentEntityDoc of rollup_entities_snap.docs) {
         const lastPendingFutureRecalcDocSnap = await db
           .collection(`active_recalcs`)
-          .where('entity_id', '==', contextParams.entityId)
+          .where('entity_id', '==', parentEntityDoc.id)
           .where('plan_name', '==', planName)
           .where('version_name', '==', versionName)
-          //.where('expires_at', '>=', admin.firestore.Timestamp.now())
+          .where('expires_at', '>=', admin.firestore.Timestamp.now())
           .orderBy('expires_at', 'desc')
           .limit(1)
           .get();
