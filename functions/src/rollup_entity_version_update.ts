@@ -187,10 +187,12 @@ const rebuildAndRecalcRollupEntityVersion = async (entityId: string, planName: s
     // Process all the plan version of each of the children of this rollup entity
     for (const child_version of childVersions) {
       const child_accts_snap = await child_version.ref.collection('dept').where('class', '==', 'acct').get();
+      console.log(`found ${child_accts_snap.docs.length} child accounts`);
 
       // Loop through all the n-level accounts of the current child version
       for (const child_acct_doc of child_accts_snap.docs) {
-        const child_acct = child_acct_doc.data() as plan_model.accountDoc;
+        const child_acct = child_acct_doc.data() as plan_model.accountDoc;  
+        console.log(`Processing child account: ${JSON.stringify(child_acct)}`);
 
         if (child_acct.dept === undefined)
           throw new Error('Query to child version accts of tupe acct returned acct(s) without dept >> Fatal error.');
@@ -209,6 +211,8 @@ const rebuildAndRecalcRollupEntityVersion = async (entityId: string, planName: s
           div: child_acct.div,
         });
 
+        console.log(`build full account:  ${full_account}`);
+
         // find matching parent account
         const fltrd_rollup_accts = rollup_version_accts.filter((rollup_acct) => {
           return rollup_acct.full_account === full_account;
@@ -216,18 +220,26 @@ const rebuildAndRecalcRollupEntityVersion = async (entityId: string, planName: s
 
         // if not parent account, push this child account into array, otherwise add to the parent account we found
         if (fltrd_rollup_accts.length === 0) {
+          console.log(`account ${child_acct.full_account} not yet in parent account array; add now ...`);
           rollup_version_accts.push({
             ...child_acct,
             dept: dept_id,
             full_account: full_account,
           });
         } else {
+          console.log(`adding account values for  ${child_acct.full_account} to parent`);
           addAccountValues(fltrd_rollup_accts[0], child_acct);
         }
+
+
+      console.log(`parent account array after addition: ${JSON.stringify(rollup_version_accts)}`);
+      
       }
+
 
       // DB: all accounts to batch
       for (const acct_obj of rollup_version_accts) {
+        console.log(`adding accrt ${JSON.stringify(acct_obj)} to batch`);
         acct_wx_batch.set(existingRollupVersionRef.collection('dept').doc(acct_obj.full_account), acct_obj);
         acct_wx_ctr++;
         // intermittent write
@@ -311,7 +323,7 @@ export const updateRollupEntityVersion = functions
           .limit(1)
           .get();
 
-        let startDateTime = new Date();
+        let startDateTime = new Date(new Date().getTime() + 120000);
         // const recalcExpiresAt = admin.firestore.Timestamp.now()
         if (!lastPendingFutureRecalcDocSnap.empty) {
           const recalcDoc = lastPendingFutureRecalcDocSnap.docs[0].data() as ActiveRecalcDoc;
@@ -335,7 +347,7 @@ export const updateRollupEntityVersion = functions
         const writeResult = await db.collection('active_recalcs').add(calcExpiresDoc);
         console.log(`Write Result is: ${JSON.stringify(writeResult)}`);
         const startDiffInMillis = startDateTime.getTime() - (new Date().getTime());
-        const inSeconds = Math.max(0, startDiffInMillis) / 1000;
+        const inSeconds = Math.max(120000, startDiffInMillis) / 1000;
 
         console.log(
           `Dispatching entity rollup recalc in ${inSeconds} seconds (${startDiffInMillis} millis) for ${parentEntityDoc.id}, ${planName}, ${versionName}`
