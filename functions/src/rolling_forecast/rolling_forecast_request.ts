@@ -52,6 +52,7 @@ export const requestRollForecast = functions
         }
 
         const rollingForecastRequest = request.body as RollingForecastRequest;
+        console.log(`Received request: ${JSON.stringify(rollingForecastRequest)}`);
 
         let query = db.collection(`entities`).where('type', '==', 'entity');
 

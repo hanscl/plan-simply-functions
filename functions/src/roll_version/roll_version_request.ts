@@ -51,6 +51,7 @@ export const requestRollVersion = functions
         }
 
         const rollVersionRequest = request.body as RollVersionRequest;
+        console.log(`Received request: ${JSON.stringify(rollVersionRequest)}`);
 
         let query = db.collection(`entities`).where('type', '==', 'entity');
 
@@ -80,12 +81,7 @@ export const requestRollVersion = functions
             entityId: entityDoc.id,
           };
 
-          await dispatchGCloudTask(
-            gctRollPanReq,
-            'roll-version-async',
-            'general',
-            inSeconds
-          );
+          await dispatchGCloudTask(gctRollPanReq, 'roll-version-async', 'general', inSeconds);
           inSeconds += 30;
         }
         response.status(200).send({ result: `Tasks for version rolls have been scheduled.` });
