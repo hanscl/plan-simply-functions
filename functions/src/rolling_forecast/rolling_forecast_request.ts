@@ -59,7 +59,7 @@ export const requestRollForecast = functions
         if (rollingForecastRequest.entityIds && rollingForecastRequest.entityIds.length > 0) {
           query = query.where(admin.firestore.FieldPath.documentId(), 'in', rollingForecastRequest.entityIds);
         }
-
+        
         const entityCollectionSnapshot = await query.get();
 
         let inSeconds = 0;

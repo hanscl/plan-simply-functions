@@ -158,7 +158,7 @@ const rebuildAndRecalcRollupEntityVersion = async (entityId: string, planName: s
 
     // DB: Create the version doc
     const version_doc: plan_model.versionDoc = {
-      last_update: admin.firestore.Timestamp.now(),
+      last_updated: admin.firestore.Timestamp.now(),
       calculated: false,
       ready_for_view: false,
       child_version_ids: childVersionIds,

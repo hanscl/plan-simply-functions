@@ -65,7 +65,7 @@ export const saveItemizedEntry = functions.region(config.cloudFuncLoc).https.onR
       if (dec_token === '5f7vMkqH6ffINY7RoPomdDVrhnE2' || dec_token === 'Cf4y9PEkLMUo8maMMmJHj1BhaA73')
         user_req = false;
 
-      await deleteDriverDefinition(recalc_request.entity_id, recalc_request.version_id, recalc_request.acct_id);
+      await deleteDriverDefinition(recalc_request.entity_id, recalc_request.plan_id,recalc_request.version_id, recalc_request.acct_id, 'entry');
 
       await version_recalc.beginVersionRollupRecalc(recalc_request, user_req, 'entry');
 

@@ -5,7 +5,7 @@ import * as driver_dependencies from './driver_dependencies';
 import * as driver_calc from './driver_calc';
 import * as utils from './utils/utils';
 import { QueryDocumentSnapshot } from 'firebase-functions/lib/providers/firestore';
-import {versionDoc} from './plan_model';
+import { versionDoc } from './plan_model';
 
 const db = admin.firestore();
 
@@ -29,17 +29,19 @@ export const driverDocUpdate = functions.firestore
 
       // check the version
       const driverDoc = await db.doc(`entities/${context.params.entityId}/drivers/${context.params.versionId}`).get();
-      if(!driverDoc.exists) {
+      if (!driverDoc.exists) {
         throw new Error(`unable to find driver doc at driverDocUpdate`);
       }
-      const planID = (driverDoc.data() as {plan_id: string, version_id: string;}).plan_id;
-      
-      const versionDocSnap = await db.doc(`entities/${context.params.entityId}/plans/${planID}/versions/${context.params.versionId}`).get();
-      if(!versionDocSnap.exists) {
+      const planID = (driverDoc.data() as { plan_id: string; version_id: string }).plan_id;
+
+      const versionDocSnap = await db
+        .doc(`entities/${context.params.entityId}/plans/${planID}/versions/${context.params.versionId}`)
+        .get();
+      if (!versionDocSnap.exists) {
         throw new Error(`unable to find version doc at driverDocUpdate`);
       }
       const version = versionDocSnap.data() as versionDoc;
-      if(!version.calculated) {
+      if (!version.calculated) {
         console.log(`Version not ready for realtime processing`);
         return;
       }
@@ -64,18 +66,19 @@ export const driverDocCreate = functions.firestore
       const planId = await createVersionDriverDoc(context.params.entityId, context.params.versionId);
 
       // check that we got a planId
-      if(planId === null) {
+      if (planId === null) {
         throw new Error(`No plan Id found`);
       } else {
         // make sure the version is fully calculated
         console.log(`entities/${context.params.entityId}/plans/${planId}/versions/${context.params.versionId}`);
-        const versionSnap = await db.doc(`entities/${context.params.entityId}/plans/${planId}/versions/${context.params.versionId}`).get();
-        if(versionSnap.exists) {
+        const versionSnap = await db
+          .doc(`entities/${context.params.entityId}/plans/${planId}/versions/${context.params.versionId}`)
+          .get();
+        if (versionSnap.exists) {
           if ((versionSnap.data() as versionDoc).calculated === false) {
             console.log(`This version is not fully calculated yet. Exit function`);
             return;
-          }
-          else {
+          } else {
             throw new Error(`VERSION DOC NOT FOUND`);
           }
         }
@@ -162,10 +165,22 @@ async function createVersionDriverDoc(entity_id: string, version_id: string) {
   }
 }
 
-export async function deleteDriverDefinition(entity_id: string, version_id: string, acct_id: string) {
+export async function deleteDriverDefinition(
+  entity_id: string,
+  plan_id: string,
+  version_id: string,
+  acct_id: string,
+  newCalcType: 'entry' | 'labor'
+) {
   try {
     console.log(`Deleting Driver: [entity]${entity_id} [version]${version_id} [acct]${acct_id}`);
     await db.doc(`entities/${entity_id}/drivers/${version_id}/dept/${acct_id}`).delete();
+    console.log(
+      `Resetting calc type to: ${newCalcType} for [entity]${entity_id} [plan]${plan_id} [version]${version_id} [acct]${acct_id}`
+    );
+    await db
+      .doc(`entities/${entity_id}/plans/${plan_id}/versions/${version_id}/dept/${acct_id}`)
+      .update({ calc_type: newCalcType });
   } catch (error) {
     console.log(`Error occured during [deleteDriverDefinition]: ${error}`);
   }

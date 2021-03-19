@@ -52,7 +52,7 @@ export const validateUploadedData = async (uploadDataRequest: UploadAccountDataR
     // confirm that all values are numbers
     const nanAccountRows = uploadDataRequest.data.filter((accountRow) => {
       const everyResult = accountRow.values.every((val) => val === null || typeof val === 'number');
-      console.log(`RESULT of every: ${everyResult}`);
+      // console.log(`RESULT of every: ${everyResult}`);
       return !everyResult;
     });
 

@@ -7,6 +7,7 @@ import * as rollup_entity_account_update from './rollup_entity_account_update';
 import * as driver_calc from './driver_calc';
 import * as config from './config';
 import * as https_utils from './utils/https_utils';
+import { deleteDriverDefinition } from './driver_doc_change'
 
 const db = admin.firestore();
 
@@ -44,9 +45,11 @@ export async function beginVersionRollupRecalc(
     // delete driver if needed
     if (caller_id === 'entry' && acct_list[0].calc_type === 'driver') {
       console.log(`Removing driver definition for ${recalc_params.acct_id} - user saved itemized entries.`);
-      await db
-        .doc(`entities/${recalc_params.entity_id}/drivers/${recalc_params.version_id}/dept/${recalc_params.acct_id}`)
-        .delete();
+      deleteDriverDefinition(recalc_params.entity_id, recalc_params.plan_id, recalc_params.version_id, recalc_params.acct_id, 'entry')
+      
+      // await db
+      //   .doc(`entities/${recalc_params.entity_id}/drivers/${recalc_params.version_id}/dept/${recalc_params.acct_id}`)
+      //   .delete();
     }
 
     console.log(
@@ -79,7 +82,7 @@ export async function beginVersionRollupRecalc(
         passed_acct_changes
       );
 
-      recalc_tx.update(version_doc.ref, { last_update: admin.firestore.Timestamp.now() });
+      recalc_tx.update(version_doc.ref, { last_updated: admin.firestore.Timestamp.now() });
 
       return recalc_res;
     });

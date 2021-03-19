@@ -12,7 +12,7 @@ export interface planDoc {
 }
 
 export interface versionDoc {
-  last_update: admin.firestore.Timestamp;
+  last_updated: admin.firestore.Timestamp;
   name: string;
   number: number;
   calculated: boolean;

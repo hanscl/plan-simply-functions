@@ -30,12 +30,13 @@ export const beginRollingForecast = async (rollingForecastRequest: RollingForeca
       .doc(targetPlanVersion.targetVersionId);
 
     // do all the rolling stuff
-    await updateVersionCalendar(newVersionRef);
-
     const { seedMonth } = rollingForecastRequest;
-    await updateAccountEntries(newVersionRef, seedMonth);
-    await updateLaborPositions(entityDoc.id, targetPlanVersion.targetVersionId, seedMonth);
-    await updateDrivers(entityDoc.id, targetPlanVersion.targetVersionId, seedMonth);
+    const relativeSeedMonth = await updateVersionCalendar(newVersionRef, seedMonth);
+
+    
+    await updateAccountEntries(newVersionRef, relativeSeedMonth);
+    await updateLaborPositions(entityDoc.id, targetPlanVersion.targetVersionId, relativeSeedMonth);
+    await updateDrivers(entityDoc.id, targetPlanVersion.targetVersionId, relativeSeedMonth);
 
     await completeRebuildAndRecalcVersion(
       {
@@ -150,7 +151,7 @@ const updateAccountEntries = async (versionRef: FirebaseFirestore.DocumentRefere
   }
 };
 
-const updateVersionCalendar = async (versionRef: FirebaseFirestore.DocumentReference) => {
+const updateVersionCalendar = async (versionRef: FirebaseFirestore.DocumentReference, seedMonth: number) => {
   try {
     const versionSnap = await versionRef.get();
     if (!versionSnap.exists) {
@@ -161,7 +162,7 @@ const updateVersionCalendar = async (versionRef: FirebaseFirestore.DocumentRefer
       throw new Error(`Missing calendar in version document [updateVersionCalendar]`);
     }
 
-    let newBeginMonth = ++versionDocData.begin_month;
+    let newBeginMonth = versionDocData.begin_month + 1;
     let newBeginYear = versionDocData.begin_year;
 
     if (newBeginMonth > 12) {
@@ -172,6 +173,16 @@ const updateVersionCalendar = async (versionRef: FirebaseFirestore.DocumentRefer
     const updatedVersionCalendar = initVersionCalendar(newBeginMonth, newBeginYear);
 
     await versionRef.update({ begin_month: newBeginMonth, begin_year: newBeginYear, periods: updatedVersionCalendar });
+
+    // offset seed month for original version & return
+    let relativeSeedMonthNumber = (seedMonth - versionDocData.begin_month) + 1;
+    if(relativeSeedMonthNumber <= 0) {
+      relativeSeedMonthNumber += 12;
+    }
+    console.log(`Seed month of ${seedMonth} has been offset to ${relativeSeedMonthNumber} to match source version`);
+
+    return relativeSeedMonthNumber;
+
   } catch (error) {
     throw new Error(`Error occured in [updateVersionCalendar]: ${error}`);
   }
