@@ -45,7 +45,7 @@ export async function beginVersionRollupRecalc(
     // delete driver if needed
     if (caller_id === 'entry' && acct_list[0].calc_type === 'driver') {
       console.log(`Removing driver definition for ${recalc_params.acct_id} - user saved itemized entries.`);
-      deleteDriverDefinition(recalc_params.entity_id, recalc_params.plan_id, recalc_params.version_id, recalc_params.acct_id, 'entry')
+      await deleteDriverDefinition(recalc_params.entity_id, recalc_params.plan_id, recalc_params.version_id, recalc_params.acct_id, 'entry')
       
       // await db
       //   .doc(`entities/${recalc_params.entity_id}/drivers/${recalc_params.version_id}/dept/${recalc_params.acct_id}`)

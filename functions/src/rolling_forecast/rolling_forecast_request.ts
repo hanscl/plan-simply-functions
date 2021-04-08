@@ -12,7 +12,7 @@ const cors = require('cors')({ origin: true });
 const db = admin.firestore();
 
 export const requestRollForecast = functions
-  .region(config.cloudFuncLoc)
+  .region(config.taskQueueLoc)
   .runWith({ timeoutSeconds: 540, memory: '1GB' })
   .https.onRequest(async (request, response) => {
     cors(request, response, async () => {

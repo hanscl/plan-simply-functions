@@ -8,6 +8,8 @@ const db = admin.firestore();
 
 export const beginRollVersion = async (rollVersionRequest: RollVersionForEntity, recalcNewVersion: boolean) => {
   try {
+    console.log(`BEGIN ROLL VERSION EXECUTING: ${JSON.stringify(rollVersionRequest)}`);
+    
     await updateCompanyPlanVersionMaster(rollVersionRequest.targetPlanVersion);
 
     if(rollVersionRequest.copyDrivers === undefined || rollVersionRequest.copyLaborPositions === undefined ) {

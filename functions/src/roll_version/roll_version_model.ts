@@ -7,7 +7,7 @@ interface RollVersionBase {
 }
 
 export interface RollVersionRequest extends RollVersionBase {
-  entityIds?: string;
+  entityIds?: string[];
 }
 
 export interface RollVersionForEntity extends RollVersionBase {

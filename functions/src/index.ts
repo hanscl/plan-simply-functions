@@ -55,7 +55,8 @@ export { testHierarchyRebuild } from './version_calc/version_hierarchy_rebuild';
 export { requestUploadTemplate } from './upload_account_data/user_template_request';
 export { validateDataToUploadIntoVersion } from './upload_account_data/user_validate_request';
 export { requestUploadDataToVersion } from './upload_account_data/user_upload_request';
-export { requestRollVersion,rollVersionGCT } from './roll_version/roll_version_request';
+export { requestRollVersion, rollVersionGCT } from './roll_version/roll_version_request';
 export { requestRollForecast, rollingForecastGCT } from './rolling_forecast/rolling_forecast_request';
-export {requestRebuildRecalcVersion, recalcRebuildVersionGCT } from './version_complete_rebuild';
+export { requestRebuildRecalcVersion, recalcRebuildVersionGCT } from './version_complete_rebuild';
 
+export { requestDeleteVersion } from './delete_version/delete_version_request';

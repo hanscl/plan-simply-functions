@@ -12,7 +12,7 @@ const db = admin.firestore();
 
 export const requestRollVersion = functions
   .runWith({ timeoutSeconds: 540, memory: '1GB' })
-  .region(config.cloudFuncLoc)
+  .region(config.taskQueueLoc)
   .https.onRequest(async (request, response) => {
     cors(request, response, async () => {
       try {

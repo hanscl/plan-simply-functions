@@ -41,17 +41,17 @@ export const driverDocUpdate = functions.firestore
         throw new Error(`unable to find version doc at driverDocUpdate`);
       }
       const version = versionDocSnap.data() as versionDoc;
-      if (!version.calculated) {
-        console.log(`Version not ready for realtime processing`);
-        return;
-      }
+      // if (!version.calculated) {
+      //   console.log(`Version not ready for realtime processing`);
+      //   return;
+      // }
 
       console.log(`no nulls found. proceeding with processing drivers`);
       await processDriverDocChange(snapshot.after, {
         entity_id: context.params.entityId,
         version_id: context.params.versionId,
         acct_id: context.params.acctId,
-      });
+      }, version.calculated);
     } catch (error) {
       console.log('Error occured while processing driver doc: ' + error);
       return;
@@ -68,21 +68,23 @@ export const driverDocCreate = functions.firestore
       // check that we got a planId
       if (planId === null) {
         throw new Error(`No plan Id found`);
-      } else {
-        // make sure the version is fully calculated
-        console.log(`entities/${context.params.entityId}/plans/${planId}/versions/${context.params.versionId}`);
-        const versionSnap = await db
-          .doc(`entities/${context.params.entityId}/plans/${planId}/versions/${context.params.versionId}`)
-          .get();
-        if (versionSnap.exists) {
-          if ((versionSnap.data() as versionDoc).calculated === false) {
-            console.log(`This version is not fully calculated yet. Exit function`);
-            return;
-          } else {
-            throw new Error(`VERSION DOC NOT FOUND`);
-          }
-        }
       }
+      
+      console.log(`entities/${context.params.entityId}/plans/${planId}/versions/${context.params.versionId}`);
+      const versionPath = `entities/${context.params.entityId}/plans/${planId}/versions/${context.params.versionId}`;
+      const versionSnap = await db
+          .doc(versionPath)
+          .get();
+        
+      if (!versionSnap.exists) {
+        throw new Error(`VERSION DOC NOT FOUND: ${versionPath}`);
+      }
+
+      const version = versionSnap.data() as versionDoc;
+          // if ((versionSnap.data() as versionDoc).calculated === false) {
+          //   console.log(`This version is not fully calculated yet. Exit function`);
+          //   return;
+         
 
       if (await driverDocNullCheck(snapshot)) {
         console.log(`drivers were updated. exit function -- this will be called again`);
@@ -95,7 +97,7 @@ export const driverDocCreate = functions.firestore
         entity_id: context.params.entityId,
         version_id: context.params.versionId,
         acct_id: context.params.acctId,
-      });
+      }, version.calculated);
     } catch (error) {
       console.log('Error occured while updating driver doc: ' + error);
       return;
@@ -104,7 +106,8 @@ export const driverDocCreate = functions.firestore
 
 async function processDriverDocChange(
   snapshot: admin.firestore.QueryDocumentSnapshot,
-  context_params: driver_model.driverParamsContext
+  context_params: driver_model.driverParamsContext,
+  versionIsCalculated: boolean
 ) {
   // get the plan & version IDs from the driver document
   const driver_doc_ref = db.doc(`entities/${context_params.entity_id}/drivers/${context_params.version_id}`);
@@ -124,7 +127,9 @@ async function processDriverDocChange(
 
   console.log(`recalcing driver value`);
   /******** 1. RECALC THE DRIVER VALUE ***************/
-  await driver_calc.driverCalcValue(acct_driver_definition, driver_params);
+  if(versionIsCalculated) {
+    await driver_calc.driverCalcValue(acct_driver_definition, driver_params);
+  }
 
   /******** 2. UPDATE DRIVER DEPENDENCIES ***************/
   const nlevel_ref_accts = await driver_dependencies.driverDependencyBuild(
@@ -132,7 +137,7 @@ async function processDriverDocChange(
     acct_driver_definition.drivers,
     driver_params
   );
-  if (nlevel_ref_accts === undefined) throw new Error('Account dependency build returned undefined');
+  if (nlevel_ref_accts === undefined || nlevel_ref_accts.length === 0) throw new Error('Account dependency build returned undefined or empty array :: DO NOT OVERWRITE');
   console.log(
     `Account list resolved from "${JSON.stringify(acct_driver_definition.drivers)}" to "${JSON.stringify(
       nlevel_ref_accts

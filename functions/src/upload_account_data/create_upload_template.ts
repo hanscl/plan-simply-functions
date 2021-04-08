@@ -54,9 +54,11 @@ async function buildReportJson(templateParams: UploadTemplateRequest): Promise<U
     }
 
     // load all accounts from this version
+    // TODO: FIX HARDCODED ACCOUNT TYPES
     const acctVersionSnap = await entity_snap.ref
       .collection(`plans/${templateParams.planId}/versions/${templateParams.versionId}/dept`)
       .where('class', '==', 'acct')
+      .where('acct_type', 'in', ['EXP_BLW', 'EXP_COS', 'EXP_OPS', 'EXP_TXB', 'EXP_WGE', 'NON_OPS', 'REV_TTL'])
       .get();
 
     for (const acctDoc of acctVersionSnap.docs) {
