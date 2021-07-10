@@ -1,5 +1,5 @@
 import * as admin from 'firebase-admin';
-// import { deleteCollection } from '../utils/utils';
+import { deleteCollection } from '../utils/utils';
 
 const db = admin.firestore();
 
@@ -40,7 +40,7 @@ const deleteDocWithCollections = async (parentCollectionPath: string, docId: str
     console.log(
       `[deleteDocWithCollections] all subcollections/docs have been deleted. delete the single top level doc ...: ${docRef.path}`
     );
-    // await docRef.delete();
+    await docRef.delete();
   } catch (error) {
     console.log(`Error occured in [deleteDocWithCollections]: ${error}`);
   }
@@ -48,7 +48,7 @@ const deleteDocWithCollections = async (parentCollectionPath: string, docId: str
 
 const recursivelyDeleteCollections = async (docRef: FirebaseFirestore.DocumentReference) => {
   try {
-    console.log(`recursively deleting all collections in docPath: ${docRef.path}`);
+    // console.log(`recursively deleting all collections in docPath: ${docRef.path}`);
 
     const collections = await docRef.listCollections();
 
@@ -65,11 +65,12 @@ const recursivelyDeleteCollections = async (docRef: FirebaseFirestore.DocumentRe
           await recursivelyDeleteCollections(doc.ref);
         }
         console.log(`recursion done. we can now delete this collection: ${coll.path}`);
-        // await deleteCollection(coll, 300);
+        await deleteCollection(coll, 300);
       }
-    } else {
-      console.log(`No child collections for this doc ...`);
-    }
+    } 
+    // else {
+    //   console.log(`No child collections for this doc ...`);
+    // }
   } catch (error) {
     console.log(`Error occured in [recursivelyDeleteCollections]: ${error}`);
   }

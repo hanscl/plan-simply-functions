@@ -151,11 +151,14 @@ const updateAllAccounts = async (
         let acctName = '';
 
         if (account.class === 'acct') {
+          console.log('POSITION 1');
           acctName = acctDict[account.acct].name;
         } else {
+          console.log('POSITION 2');
           acctName = rollupNames.filter((nameMap) => nameMap.code === account.acct)[0].name;
         }
 
+        console.log('POSITION 3');
         await versionDocRef
           .collection('dept')
           .doc(account.full_account)
@@ -221,6 +224,7 @@ const updateRollupAccountsInFirestore = async (
     div: divId,
     dept: deptId,
   });
+  console.log('POSITION 4');
   const acctUpdates = {
     acct: acctId,
     acct_name: rollupNames.filter((rollup) => rollup.code === acctId)[0].name,
@@ -235,8 +239,10 @@ const updateRollupAccountsInFirestore = async (
 
   let finalAcctUpdates = {};
   if (deptId) {
+    console.log('POSITION 5');
     finalAcctUpdates = { ...acctUpdates, divdept_name: deptDict[deptId].name, dept: deptId };
   } else {
+    console.log('POSITION 6');
     finalAcctUpdates = { ...acctUpdates, divdept_name: divDict[divId].name };
   }
 
