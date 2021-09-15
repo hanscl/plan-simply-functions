@@ -1,0 +1,7 @@
+{
+  "projects": {
+    "dev": "plan-simply-dmdev",
+    "uat": "plan-simply",
+    "prod": "generator-zerobase"
+  }
+}
