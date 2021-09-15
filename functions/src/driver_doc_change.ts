@@ -7,6 +7,11 @@ import * as utils from './utils/utils';
 import { QueryDocumentSnapshot } from 'firebase-functions/lib/providers/firestore';
 import { versionDoc } from './plan_model';
 
+interface DriverVersionDoc {
+  plan_id: string;
+  version_id: string;
+}
+
 const db = admin.firestore();
 
 export const driverDocUpdate = functions.firestore
@@ -152,7 +157,10 @@ async function processDriverDocChange(
 async function createVersionDriverDoc(entity_id: string, version_id: string) {
   try {
     const driver_doc = await db.doc(`entities/${entity_id}/drivers/${version_id}`).get();
-    if (driver_doc.exists) return;
+    if (driver_doc.exists) {
+      const driverVersionAndPlan = driver_doc.data() as DriverVersionDoc;
+      return driverVersionAndPlan.plan_id;
+    }
 
     // find the correct plan_id
     const plan_snap = await db.collection(`entities/${entity_id}/plans`).get();
