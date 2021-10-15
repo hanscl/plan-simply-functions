@@ -15,6 +15,7 @@ interface userDoc {
   role_names: string[];
   roles: string[];
   active: boolean;
+  deleted?: boolean;
 }
 
 interface custClaims {
@@ -56,7 +57,7 @@ async function compareEntities(
         if (entities_after.indexOf(child_entity) === -1) {
           entities_after.push(child_entity);
           entities_changed = true;
-          console.log("Adding child entity" + child_entity);
+          console.log("Adding child entity", child_entity);
         }
       }
     });
@@ -75,6 +76,32 @@ export const writeUserAccount = functions.firestore
 
       //console.log(`user_before object: ${JSON.stringify(user_before)}`);
       //console.log(`user_after object: ${JSON.stringify(user_after)}`);
+
+      if (!snapshot.before.exists) {
+        console.log('creating user',  user_after.email)
+        // create user
+        await admin.auth()
+            .createUser({
+              uid: userId,
+              disabled: !user_after.active,
+              email: user_after.email
+            });
+
+      } else if (!snapshot.after.exists) {
+        console.warn('hard delete of user object not supported', user_before?.email);
+      } else {
+        if (user_before.email !== user_after.email ||
+            user_before.active !== user_after.active ||
+            user_before.deleted !== user_after.deleted
+        ) {
+          console.log('updating user',  user_after.email)
+          await admin.auth()
+              .updateUser(userId, {
+                email: user_after.email,
+                disabled: user_after.deleted || !user_after.active,
+              })
+        }
+      }
 
       let read_entities_changed = false;
       let write_entities_changed = false;
