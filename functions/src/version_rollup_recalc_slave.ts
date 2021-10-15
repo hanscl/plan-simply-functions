@@ -87,11 +87,13 @@ export async function executeVersionRollupRecalc(recalc_params: recalcParams, re
     console.log(`utils calculated differences: ${JSON.stringify(acct_changes)}`);
 
     // if there is no change across all 12 months, exit => this is important to avoid endless update triggers!!
-    if (acct_changes.months_changed.length === 0) {
+    // 2021-09-15: add check to ensure that the calc_type is correct and if it is not then proceed with update, even if values didn't change
+    if (acct_changes.months_changed.length === 0 && caller_id === nlevel_acct_before.calc_type) {
       // save comments if they changed
       if(recalc_params.comments !== undefined && recalc_params.comments !== nlevel_acct_before.comments) {
         recalc_tx.update(acct_ref,  { comments: recalc_params.comments});
       }
+
       return undefined;
     }
 
